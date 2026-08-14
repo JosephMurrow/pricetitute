@@ -4,7 +4,8 @@ import { prisma } from "../../lib/prisma";
 import { robotAvatarId } from "../../lib/robots";
 import type { ChatMessagePayload } from "../../shared/protocol";
 import type { ManagedRoom, RoomManager } from "../rooms";
-import { BOT_PHRASES, BOT_ROSTER } from "./roster";
+import { moodOf, phraseFor } from "./mood";
+import { BOT_ROSTER, BOT_VICTORY_PHRASES } from "./roster";
 
 /**
  * Режим «Forever alone»: комната набивается ботами, чтобы играть одному.
@@ -52,6 +53,8 @@ export class BotDirector {
   private readonly parties = new Map<string, Seat[]>();
   /** Когда в комнате последний раз говорил бот. */
   private readonly lastChatAt = new Map<string, number>();
+  /** Вопрос последней вскрышки, которую уже отпраздновали. */
+  private readonly celebrated = new Map<string, string>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -133,6 +136,7 @@ export class BotDirector {
 
     this.parties.delete(roomKey);
     this.lastChatAt.delete(roomKey);
+    this.celebrated.delete(roomKey);
 
     for (const seat of seats) {
       this.deps.sendChat(roomKey, message(seat, seat.farewell));
@@ -145,6 +149,7 @@ export class BotDirector {
   dismiss(roomKey: string): void {
     this.parties.delete(roomKey);
     this.lastChatAt.delete(roomKey);
+    this.celebrated.delete(roomKey);
   }
 
   private tick(): void {
@@ -164,7 +169,8 @@ export class BotDirector {
       }
 
       this.play(managed, seats, now);
-      this.chatter(roomKey, seats, now);
+      this.celebrate(managed, seats, now);
+      this.chatter(managed, seats, now);
     }
   }
 
@@ -205,7 +211,36 @@ export class BotDirector {
     }
   }
 
-  private chatter(roomKey: string, seats: Seat[], now: number): void {
+  /**
+   * Победная реплика на вскрышке. Идёт в обход общей паузы: она привязана к
+   * моменту, а не к таймеру, иначе половина побед осталась бы без реакции.
+   */
+  private celebrate(managed: ManagedRoom, seats: Seat[], now: number): void {
+    const view = managed.room.view();
+    if (view.phase !== "reveal" || !view.questionId) return;
+
+    // Один раунд празднуем один раз, даже если тик пришёл десять раз подряд.
+    if (this.celebrated.get(managed.key) === view.questionId) return;
+    this.celebrated.set(managed.key, view.questionId);
+
+    const winners = new Set(view.reveal?.winners ?? []);
+    const lucky = seats.filter((seat) => winners.has(seat.userId));
+    if (lucky.length === 0) return;
+
+    // Даже если победило несколько ботов, говорит один: хор из десяти
+    // одинаковых поздравлений — это не веселье, а стена текста.
+    const seat = lucky[randomInt(lucky.length)];
+    if (!seat) return;
+
+    this.deps.sendChat(
+      managed.key,
+      message(seat, pick(BOT_VICTORY_PHRASES, "изи")),
+    );
+    this.lastChatAt.set(managed.key, now);
+  }
+
+  private chatter(managed: ManagedRoom, seats: Seat[], now: number): void {
+    const roomKey = managed.key;
     const quietUntil = (this.lastChatAt.get(roomKey) ?? 0) + CHAT_COOLDOWN_MS;
     if (now < quietUntil) return;
 
@@ -215,12 +250,24 @@ export class BotDirector {
     const seat = ready[randomInt(ready.length)];
     if (!seat) return;
 
-    const phrase = BOT_PHRASES[randomInt(BOT_PHRASES.length)] ?? "…";
-    this.deps.sendChat(roomKey, message(seat, phrase));
+    this.deps.sendChat(roomKey, message(seat, moodPhrase(managed, seat)));
 
     this.lastChatAt.set(roomKey, now);
     seat.nextChatAt = now + randomBetween(CHAT_MIN_MS, CHAT_MAX_MS);
   }
+}
+
+/** Что бот скажет с учётом положения дел в комнате. */
+function moodPhrase(managed: ManagedRoom, seat: Seat): string {
+  const standings = managed.room
+    .view()
+    .players.map((player) => ({ id: player.id, score: player.score }));
+
+  return phraseFor(moodOf(standings, seat.userId));
+}
+
+function pick(source: readonly string[], fallback: string): string {
+  return source[randomInt(source.length)] ?? fallback;
 }
 
 interface Plan {
