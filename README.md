@@ -31,19 +31,20 @@ openssl rand -base64 48
 
 ## Скрипты
 
-| Команда                     | Что делает                                   |
-| --------------------------- | -------------------------------------------- |
-| `npm run dev`               | Next + Socket.IO в одном процессе, dev-режим |
-| `npm run build`             | Продакшен-сборка Next                        |
-| `npm start`                 | Продакшен-запуск того же кастомного сервера  |
-| `npm run lint`              | ESLint                                       |
-| `npm run format`            | Prettier                                     |
-| `npm run typecheck`         | `tsc --noEmit`                               |
-| `npm test`                  | Юнит-тесты на встроенном раннере Node        |
-| `npm run db:up` / `db:down` | Postgres в docker-compose                    |
-| `npm run db:migrate`        | Миграция + перегенерация клиента             |
-| `npm run db:seed`           | Заливка пула вопросов                        |
-| `npm run db:studio`         | Prisma Studio                                |
+| Команда                     | Что делает                                     |
+| --------------------------- | ---------------------------------------------- |
+| `npm run dev`               | Next + Socket.IO в одном процессе, dev-режим   |
+| `npm run build`             | Продакшен-сборка Next                          |
+| `npm start`                 | Продакшен-запуск того же кастомного сервера    |
+| `npm run lint`              | ESLint                                         |
+| `npm run format`            | Prettier                                       |
+| `npm run typecheck`         | `tsc --noEmit`                                 |
+| `npm test`                  | Юнит-тесты на встроенном раннере Node          |
+| `npm run smoke:sockets`     | Два клиента играют раунд (нужен `npm run dev`) |
+| `npm run db:up` / `db:down` | Postgres в docker-compose                      |
+| `npm run db:migrate`        | Миграция + перегенерация клиента               |
+| `npm run db:seed`           | Заливка пула вопросов                          |
+| `npm run db:studio`         | Prisma Studio                                  |
 
 Имя миграции `db:migrate` не принимает: npm дописывает аргументы в конец всей
 цепочки, и `--name` уедет не той команде. Либо отвечай на интерактивный запрос

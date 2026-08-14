@@ -98,6 +98,8 @@ export interface RoomView {
   players: PlayerView[];
   /** Заполнено только в фазе вскрышки. */
   reveal: RevealView | null;
+  /** Почему комната стоит: заполнено только в фазе ожидания. */
+  pauseReason: PauseReason | null;
 }
 
 interface PlayerStats {
@@ -116,6 +118,7 @@ export class Room {
   private hostAnswer: Bet | null = null;
   private readonly bets = new Map<string, Bet>();
   private reveal: RevealView | null = null;
+  private pauseReason: PauseReason | null = null;
   private readonly stats = new Map<string, PlayerStats>();
 
   constructor(
@@ -285,6 +288,7 @@ export class Room {
         };
       }),
       reveal: this.reveal,
+      pauseReason: this.pauseReason,
     };
   }
 
@@ -312,6 +316,7 @@ export class Room {
     if (questionId === null) return this.pause("no_questions");
 
     this.cursor = (index + 1) % this.order.length;
+    this.pauseReason = null;
     this.hostId = host;
     this.questionId = questionId;
     this.hostAnswer = null;
@@ -409,6 +414,7 @@ export class Room {
     this.clearRound();
     this.phase = "waiting";
     this.deadline = null;
+    this.pauseReason = reason;
 
     return [{ type: "paused", reason }];
   }
