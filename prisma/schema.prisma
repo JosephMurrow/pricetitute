@@ -8,6 +8,52 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Тональность вопроса. Нужна для баланса пула при наполнении;
+/// в игре фильтруем по adult.
+enum QuestionCategory {
+  /// Бытовое и неловкое: мокрые носки, неделя без кофе.
+  DAILY
+  /// Социально рискованное: репутация, работа, друзья, соцсети.
+  SOCIAL
+  /// Откровенное, только для 18+.
+  ADULT
+}
+
+/// Вопрос из пула. Задаётся ведущему, тот отвечает суммой (см. docs/SPEC.md §6).
+model Question {
+  id       String           @id @default(cuid())
+  text     String           @unique
+  category QuestionCategory
+  /// В приватной комнате хост может выключить такие вопросы.
+  adult    Boolean          @default(false)
+  /// Выключенный вопрос не попадает в новые очереди.
+  active   Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([active, adult])
+  @@map("questions")
+}
+
+/// Очередь вопросов конкретной комнаты: порядок сохраняется между
+/// перезапусками сервера. Голова очереди — нулевой элемент массива.
+model RoomQuestionQueue {
+  id String @id @default(cuid())
+  /// "global" для общей комнаты, иначе идентификатор приватной.
+  roomKey String @unique
+  /// Идентификаторы вопросов в порядке выдачи.
+  queue String[]
+  /// Уже выданные в текущем круге: без этого после перезапуска сервера
+  /// показанные вопросы вернулись бы в очередь как новые.
+  consumed String[]
+  /// Учитываются ли в этой очереди вопросы 18+.
+  includeAdult Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("room_question_queues")
+}
+
 /// Игрок. Регистрация — только логин и пароль, email не собираем,
 /// восстановления пароля нет (см. docs/SPEC.md §2).
 model User {

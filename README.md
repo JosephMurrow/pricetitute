@@ -39,17 +39,30 @@ openssl rand -base64 48
 | `npm run lint`              | ESLint                                       |
 | `npm run format`            | Prettier                                     |
 | `npm run typecheck`         | `tsc --noEmit`                               |
+| `npm test`                  | Юнит-тесты на встроенном раннере Node        |
 | `npm run db:up` / `db:down` | Postgres в docker-compose                    |
-| `npm run db:migrate`        | `prisma migrate dev`                         |
+| `npm run db:migrate`        | Миграция + перегенерация клиента             |
+| `npm run db:seed`           | Заливка пула вопросов                        |
 | `npm run db:studio`         | Prisma Studio                                |
+
+Имя миграции `db:migrate` не принимает: npm дописывает аргументы в конец всей
+цепочки, и `--name` уедет не той команде. Либо отвечай на интерактивный запрос
+имени, либо зови напрямую:
+
+```bash
+npx prisma migrate dev --name my_migration
+```
 
 ## Что важно знать про окружение
 
 - **Prisma 7** не читает `.env` сама: строка подключения задаётся в
   `prisma.config.ts`, который подгружает dotenv. Клиент работает через
   драйверный адаптер `@prisma/adapter-pg`, а не через `url` в схеме.
-- **Сгенерированный клиент** лежит в `src/generated/prisma` и не коммитится —
-  создаётся на `postinstall` и на каждой миграции.
+- **Сгенерированный клиент** лежит в `src/generated/prisma` и не коммитится.
+  `prisma migrate dev` в Prisma 7 его **не** перегенерирует — если поменял
+  модели, нужен `prisma generate`, иначе новые модели просто не появятся в
+  клиенте (`prisma.question` будет `undefined`). В `npm run db:migrate` обе
+  команды уже связаны.
 - **Сервер** запускается через `node --import tsx server.ts`: это кастомный
   сервер, поэтому `next dev` напрямую использовать не нужно.
 - **`httpServer` обязательно передаётся в `next({ ... })`.** Иначе Next не

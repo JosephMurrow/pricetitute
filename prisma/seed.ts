@@ -1,0 +1,63 @@
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { QUESTIONS } from "./seed/questions";
+
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL не задан — нечего сидировать");
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
+
+async function main() {
+  const duplicates = findDuplicates(QUESTIONS.map((question) => question.text));
+  if (duplicates.length > 0) {
+    throw new Error(
+      `В пуле есть повторы, поправь их перед заливкой:\n${duplicates.join("\n")}`,
+    );
+  }
+
+  // createMany со skipDuplicates: повторный запуск не ломается и не плодит
+  // копии, а новые вопросы просто добавляются.
+  const { count } = await prisma.question.createMany({
+    data: QUESTIONS,
+    skipDuplicates: true,
+  });
+
+  const stats = await prisma.question.groupBy({
+    by: ["category"],
+    _count: { _all: true },
+  });
+
+  const total = await prisma.question.count();
+
+  console.log(`Добавлено новых вопросов: ${count}`);
+  console.log(`Всего в пуле: ${total}`);
+  for (const row of stats) {
+    console.log(`  ${row.category}: ${row._count._all}`);
+  }
+}
+
+function findDuplicates(texts: string[]): string[] {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+
+  for (const text of texts) {
+    const key = text.trim().toLowerCase();
+    if (seen.has(key)) repeated.add(text);
+    seen.add(key);
+  }
+
+  return [...repeated];
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  })
+  .finally(() => {
+    void prisma.$disconnect();
+  });
