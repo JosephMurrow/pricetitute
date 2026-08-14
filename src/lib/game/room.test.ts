@@ -242,13 +242,28 @@ describe("Room: очки", () => {
     room.join("боря", 0);
     room.join("вера", 0);
 
-    playRound(room, "аня", 100_000, { боря: 300_000, вера: 10_000 });
+    // Боря промахивается в 1.3 раза и укладывается в порог, Вера мимо в
+    // десять раз — очко достаётся Боре.
+    playRound(room, "аня", 100_000, { боря: 130_000, вера: 10_000 });
 
     const view = room.view();
     assert.deepEqual(view.reveal?.winners, ["боря"]);
     assert.equal(view.players.find((p) => p.id === "боря")?.score, 1);
     assert.equal(view.players.find((p) => p.id === "вера")?.score, 0);
     assert.equal(view.players.find((p) => p.id === "аня")?.score, 0);
+  });
+
+  it("оставляет раунд без победителя, если промахнулись все", () => {
+    const room = new Room("test", new FakeQuestions());
+    room.join("аня", 0);
+    room.join("боря", 0);
+    room.join("вера", 0);
+
+    playRound(room, "аня", 100_000, { боря: 300_000, вера: 10_000 });
+
+    const view = room.view();
+    assert.deepEqual(view.reveal?.winners, []);
+    assert.ok(view.players.every((player) => player.score === 0));
   });
 
   it("отдаёт в событии полный раунд для сохранения", () => {

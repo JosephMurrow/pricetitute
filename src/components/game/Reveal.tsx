@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { formatBet, isNever } from "@/lib/game/bet";
+import { MAX_MISS_FACTOR } from "@/lib/game/scoring";
 import type { RoomStatePayload } from "@/shared/protocol";
 
 /**
@@ -30,6 +31,13 @@ export function Reveal({ state }: { state: RoomStatePayload }) {
           {formatBet(reveal.hostAnswer)}
         </p>
       </div>
+
+      {sorted.length > 0 && !sorted.some((bet) => bet.won) && (
+        <p className="rounded-xl border border-line bg-paper px-4 py-3 text-center text-sm text-muted">
+          Никто не угадал достаточно близко. Очко достаётся, если промахнуться
+          не больше чем в {MAX_MISS_FACTOR} раза.
+        </p>
+      )}
 
       {sorted.length === 0 ? (
         <p className="text-center text-sm text-muted">
