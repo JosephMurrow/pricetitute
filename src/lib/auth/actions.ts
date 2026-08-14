@@ -15,6 +15,15 @@ import {
   registerSchema,
 } from "./validation";
 
+/**
+ * Куда вернуть после входа. Принимаем только относительный путь: внешний адрес
+ * в этом параметре — это открытый редирект.
+ */
+function safeNext(value: FormDataEntryValue | null): string {
+  const path = typeof value === "string" ? value : "";
+  return path.startsWith("/") && !path.startsWith("//") ? path : "/profile";
+}
+
 /** Prisma кидает P2002 при нарушении уникальности. */
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -79,7 +88,7 @@ export async function registerAction(
   }
 
   await startSession(userId);
-  redirect("/profile");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function loginAction(
@@ -111,7 +120,7 @@ export async function loginAction(
   if (!passwordOk) return wrong;
 
   await startSession(user.id);
-  redirect("/profile");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function logoutAction(): Promise<void> {

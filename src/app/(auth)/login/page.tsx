@@ -7,7 +7,13 @@ export const metadata: Metadata = {
   title: `Вход — ${BRAND}`,
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
@@ -17,7 +23,7 @@ export default function LoginPage() {
 
         <div className="rounded-2xl border border-line bg-paper p-6">
           <h1 className="mb-5 text-xl font-semibold">Вход</h1>
-          <LoginForm />
+          <LoginForm next={next} />
         </div>
       </div>
     </main>

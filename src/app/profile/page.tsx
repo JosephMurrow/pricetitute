@@ -33,6 +33,13 @@ export default async function ProfilePage() {
           </Link>
 
           <Link
+            href="/rooms/new"
+            className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-muted transition hover:border-crimson hover:text-crimson"
+          >
+            Своя комната
+          </Link>
+
+          <Link
             href="/play"
             className="rounded-lg bg-crimson px-3 py-1.5 text-sm font-semibold text-paper transition hover:bg-deep"
           >

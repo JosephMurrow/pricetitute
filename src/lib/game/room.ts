@@ -9,7 +9,26 @@ import { resolveRound, type PlayerBet, type RoundOutcome } from "./scoring";
  * по расписанию и рассылает `view()` после каждого изменения.
  */
 
-export type Phase = "waiting" | "ready" | "host_answer" | "betting" | "reveal";
+export type Phase =
+  | "waiting"
+  | "ready"
+  | "host_answer"
+  | "betting"
+  | "reveal"
+  /** Партия доиграна до условия конца: висит экран победителя. */
+  | "finished";
+
+/** Чем заканчивается партия (см. docs/SPEC.md §3.2). */
+export type EndMode = "endless" | "rounds" | "points";
+
+export interface RoomOptions {
+  timings?: Partial<RoomTimings>;
+  endMode?: EndMode;
+  /** Сколько раундов или очков до конца партии. */
+  endValue?: number | null;
+  /** Хозяин приватной комнаты: только он выгоняет игроков и начинает заново. */
+  ownerId?: string | null;
+}
 
 export interface RoomTimings {
   /** Сколько у ведущего есть на кнопку «Прочитал». */
@@ -61,7 +80,8 @@ export type GameEvent =
   | { type: "round_started"; hostId: string; questionId: string }
   | { type: "round_aborted"; reason: AbortReason; questionId: string }
   | { type: "round_resolved"; record: RoundRecord }
-  | { type: "paused"; reason: PauseReason };
+  | { type: "paused"; reason: PauseReason }
+  | { type: "game_finished"; winners: string[] };
 
 export interface ActionResult {
   accepted: boolean;
@@ -102,6 +122,13 @@ export interface RoomView {
   reveal: RevealView | null;
   /** Почему комната стоит: заполнено только в фазе ожидания. */
   pauseReason: PauseReason | null;
+  /** Победители партии: заполнено только на финальном экране. */
+  winners: string[] | null;
+  /** Сколько раундов сыграно в текущей партии. */
+  roundsPlayed: number;
+  endMode: EndMode;
+  endValue: number | null;
+  ownerId: string | null;
 }
 
 interface PlayerStats {
@@ -121,13 +148,26 @@ export class Room {
   private readonly bets = new Map<string, Bet>();
   private reveal: RevealView | null = null;
   private pauseReason: PauseReason | null = null;
+  private winners: string[] | null = null;
+  /** Сыграно раундов в текущей партии — для условия конца по раундам. */
+  private roundsPlayed = 0;
   private readonly stats = new Map<string, PlayerStats>();
+
+  private readonly timings: RoomTimings;
+  private readonly endMode: EndMode;
+  private readonly endValue: number | null;
+  private readonly ownerId: string | null;
 
   constructor(
     readonly key: string,
     private readonly questions: QuestionSource,
-    private readonly timings: RoomTimings = DEFAULT_TIMINGS,
-  ) {}
+    options: RoomOptions = {},
+  ) {
+    this.timings = { ...DEFAULT_TIMINGS, ...options.timings };
+    this.endMode = options.endMode ?? "endless";
+    this.endValue = options.endValue ?? null;
+    this.ownerId = options.ownerId ?? null;
+  }
 
   // — Действия игроков ————————————————————————————————————————
 
@@ -260,10 +300,51 @@ export class Room {
       case "betting":
         return this.resolve(now);
       case "reveal":
-        return this.startRound(now);
+        return this.shouldFinish() ? this.finish() : this.startRound(now);
       case "waiting":
+      case "finished":
         return [];
     }
+  }
+
+  /** Хозяин приватной комнаты выгоняет игрока. */
+  kick(requesterId: string, targetId: string, now: number): ActionResult {
+    if (this.ownerId === null || requesterId !== this.ownerId) {
+      return {
+        accepted: false,
+        reason: "Выгонять может только хозяин комнаты",
+        events: [],
+      };
+    }
+    if (targetId === this.ownerId) {
+      return { accepted: false, reason: "Себя выгнать нельзя", events: [] };
+    }
+
+    return this.leave(targetId, now);
+  }
+
+  /** Хозяин начинает новую партию после финального экрана. */
+  restart(requesterId: string, now: number): ActionResult {
+    if (this.ownerId === null || requesterId !== this.ownerId) {
+      return {
+        accepted: false,
+        reason: "Начать заново может только хозяин комнаты",
+        events: [],
+      };
+    }
+    if (this.phase !== "finished") {
+      return { accepted: false, reason: "Партия ещё идёт", events: [] };
+    }
+
+    for (const stats of this.stats.values()) {
+      stats.score = 0;
+      stats.roundsPlayed = 0;
+    }
+    this.roundsPlayed = 0;
+    this.winners = null;
+    this.cursor = 0;
+
+    return { accepted: true, events: this.startRound(now) };
   }
 
   // — Состояние ————————————————————————————————————————————
@@ -292,6 +373,11 @@ export class Room {
       }),
       reveal: this.reveal,
       pauseReason: this.pauseReason,
+      winners: this.winners,
+      roundsPlayed: this.roundsPlayed,
+      endMode: this.endMode,
+      endValue: this.endValue,
+      ownerId: this.ownerId,
     };
   }
 
@@ -372,6 +458,7 @@ export class Room {
       this.statsFor(bet.playerId).roundsPlayed += 1;
     }
 
+    this.roundsPlayed += 1;
     this.reveal = {
       hostAnswer,
       bets,
@@ -430,6 +517,37 @@ export class Room {
     this.reveal = null;
   }
 
+  /** Пора ли заканчивать партию: проверяется после вскрышки. */
+  private shouldFinish(): boolean {
+    const target = this.endValue;
+    if (target === null || target <= 0) return false;
+
+    if (this.endMode === "rounds") {
+      return this.roundsPlayed >= target;
+    }
+    if (this.endMode === "points") {
+      return [...this.stats.values()].some((stats) => stats.score >= target);
+    }
+
+    return false;
+  }
+
+  private finish(): GameEvent[] {
+    const scores = this.order.map((id) => this.stats.get(id)?.score ?? 0);
+    const best = Math.max(0, ...scores);
+
+    this.winners =
+      best > 0
+        ? this.order.filter((id) => (this.stats.get(id)?.score ?? 0) === best)
+        : [];
+
+    this.clearRound();
+    this.phase = "finished";
+    this.deadline = null;
+
+    return [{ type: "game_finished", winners: this.winners }];
+  }
+
   private phaseDuration(): number | null {
     switch (this.phase) {
       case "ready":
@@ -441,6 +559,7 @@ export class Room {
       case "reveal":
         return this.timings.revealMs;
       case "waiting":
+      case "finished":
         return null;
     }
   }

@@ -5,6 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import type { Bet } from "@/lib/game/bet";
 import {
   CLIENT_EVENT,
+  ROOM_QUERY,
   SERVER_EVENT,
   SOCKET_PATH,
   type Ack,
@@ -21,26 +22,36 @@ export interface GameRoomHandle {
   /** Насколько часы сервера впереди клиентских, мс. */
   clockOffset: number;
   error: string | null;
+  /** Заполнено, если сервер выставил из комнаты: причина и конец связи. */
+  kicked: string | null;
   confirmRead: () => Promise<void>;
   submitAnswer: (bet: Bet) => Promise<void>;
   placeBet: (bet: Bet) => Promise<void>;
   sendChat: (text: string) => Promise<boolean>;
+  /** Хозяин приватной комнаты выгоняет игрока. */
+  kick: (playerId: string) => Promise<void>;
+  /** Хозяин начинает новую партию после финального экрана. */
+  restart: () => Promise<void>;
 }
 
 /**
  * Подключение к игровой комнате. Сервер шлёт полный снимок состояния, поэтому
  * хук ничего не досчитывает — только хранит последний снимок и поправку часов.
  */
-export function useGameRoom(): GameRoomHandle {
+export function useGameRoom(roomCode?: string): GameRoomHandle {
   const [state, setState] = useState<RoomStatePayload | null>(null);
   const [chat, setChat] = useState<ChatMessagePayload[]>([]);
   const [connected, setConnected] = useState(false);
   const [clockOffset, setClockOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [kicked, setKicked] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socket = io({ path: SOCKET_PATH });
+    const socket = io({
+      path: SOCKET_PATH,
+      query: roomCode ? { [ROOM_QUERY]: roomCode } : undefined,
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -57,6 +68,11 @@ export function useGameRoom(): GameRoomHandle {
       setClockOffset(payload.serverTime - Date.now());
       setState(payload);
     });
+    socket.on(SERVER_EVENT.kicked, (payload: { reason?: string }) => {
+      setKicked(payload?.reason ?? "Комната больше недоступна");
+      // Переподключаться незачем — обратно всё равно не пустят.
+      socket.disconnect();
+    });
     socket.on(SERVER_EVENT.chatHistory, (history: ChatMessagePayload[]) => {
       setChat(history);
     });
@@ -68,7 +84,7 @@ export function useGameRoom(): GameRoomHandle {
       socket.close();
       socketRef.current = null;
     };
-  }, []);
+  }, [roomCode]);
 
   // Ошибка действия — это подсказка на секунду, а не состояние экрана.
   useEffect(() => {
@@ -122,15 +138,29 @@ export function useGameRoom(): GameRoomHandle {
     [act],
   );
 
+  const kick = useCallback(
+    async (playerId: string) => {
+      await act(CLIENT_EVENT.kick, { playerId });
+    },
+    [act],
+  );
+
+  const restart = useCallback(async () => {
+    await act(CLIENT_EVENT.restart);
+  }, [act]);
+
   return {
     state,
     chat,
     connected,
     clockOffset,
     error,
+    kicked,
     confirmRead,
     submitAnswer,
     placeBet,
     sendChat,
+    kick,
+    restart,
   };
 }

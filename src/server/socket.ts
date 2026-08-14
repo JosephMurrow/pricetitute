@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
 import { Server as IOServer, type Socket } from "socket.io";
 import { parseBet } from "../lib/game/bet";
+import { findPrivateRoom } from "../lib/rooms/private";
 import {
   CHAT_MAX_LENGTH,
   CLIENT_EVENT,
   GLOBAL_ROOM,
+  ROOM_QUERY,
   SERVER_EVENT,
   SOCKET_PATH,
   type Ack,
@@ -14,7 +16,14 @@ import {
 } from "../shared/protocol";
 import { authenticateSocket, type SocketUser } from "./auth";
 import { RateLimiter } from "./rate-limit";
-import { pushChat, RoomManager, type ManagedRoom } from "./rooms";
+import {
+  GLOBAL_SETUP,
+  pushChat,
+  RoomManager,
+  startRoomCleanup,
+  type ManagedRoom,
+  type RoomSetup,
+} from "./rooms";
 
 export { SOCKET_PATH };
 
@@ -56,7 +65,42 @@ export function createSocketServer(httpServer: HttpServer): IOServer {
     void onConnection(io, manager, socket);
   });
 
+  startRoomCleanup(manager);
+
   return io;
+}
+
+/**
+ * Куда сажать игрока: без кода — общая комната, с кодом — приватная.
+ * Правила партии берутся из базы, а не из того, что прислал клиент.
+ */
+async function resolveRoom(
+  socket: Socket,
+): Promise<{ key: string; code: string | null; setup: RoomSetup } | null> {
+  const raw = socket.handshake.query[ROOM_QUERY];
+  const code = typeof raw === "string" ? raw.trim() : "";
+
+  if (code === "") {
+    return { key: GLOBAL_ROOM, code: null, setup: GLOBAL_SETUP };
+  }
+
+  const room = await findPrivateRoom(code);
+  if (!room) return null;
+
+  return {
+    key: room.id,
+    code: room.code,
+    setup: {
+      pool: { includeAdult: room.includeAdult },
+      rules: {
+        timings: { bettingMs: room.bettingMs },
+        endMode: room.endMode,
+        endValue: room.endValue,
+        ownerId: room.hostId,
+      },
+      isPrivate: true,
+    },
+  };
 }
 
 async function onConnection(
@@ -70,12 +114,21 @@ async function onConnection(
     return;
   }
 
-  const roomKey = GLOBAL_ROOM;
-  const managed = await manager.join(user, roomKey);
+  const target = await resolveRoom(socket);
+  if (!target) {
+    socket.emit(SERVER_EVENT.kicked, { reason: "Комната не найдена" });
+    socket.disconnect(true);
+    return;
+  }
+
+  const roomKey = target.key;
+  const roomCode = target.code;
+  const managed = await manager.join(user, roomKey, target.setup);
   await socket.join(roomKey);
 
+  socket.data.roomCode = roomCode;
   socket.emit(SERVER_EVENT.chatHistory, managed.chat);
-  socket.emit(SERVER_EVENT.state, buildState(managed, user.id));
+  socket.emit(SERVER_EVENT.state, buildState(managed, user.id, roomCode));
   void broadcastState(io, managed);
 
   socket.on(CLIENT_EVENT.read, (...args: unknown[]) => {
@@ -140,6 +193,31 @@ async function onConnection(
     });
   });
 
+  socket.on(CLIENT_EVENT.kick, (...args: unknown[]) => {
+    respond(args, (payload) => {
+      const targetId = readString(payload, "playerId");
+      if (!targetId) return { accepted: false, reason: "Кого выгонять?" };
+
+      const result = managed.runner.run((room, now) =>
+        room.kick(user.id, targetId, now),
+      );
+
+      // Выгнать из круга мало: без разрыва сокета человек остался бы в
+      // комнате призраком — видел бы игру, но не мог в ней участвовать.
+      if (result.accepted) {
+        void disconnectPlayer(io, roomKey, targetId, "Тебя выгнали из комнаты");
+      }
+
+      return result;
+    });
+  });
+
+  socket.on(CLIENT_EVENT.restart, (...args: unknown[]) => {
+    respond(args, () =>
+      managed.runner.run((room, now) => room.restart(user.id, now)),
+    );
+  });
+
   socket.on("disconnect", () => {
     manager.leave(user, roomKey);
     void broadcastState(io, managed);
@@ -150,6 +228,7 @@ async function onConnection(
 export function buildState(
   managed: ManagedRoom,
   viewerId: string,
+  roomCode: string | null = null,
 ): RoomStatePayload {
   const view = managed.room.view();
   // В фазе READY вопрос знает только ведущий.
@@ -189,8 +268,32 @@ export function buildState(
         }
       : null,
     pauseReason: view.pauseReason,
+    winners: view.winners,
+    roundsPlayed: view.roundsPlayed,
+    endMode: view.endMode,
+    endValue: view.endValue,
+    ownerId: view.ownerId,
+    roomCode,
     youId: viewerId,
   };
+}
+
+/** Разорвать все соединения игрока с комнатой, объяснив причину. */
+async function disconnectPlayer(
+  io: IOServer,
+  roomKey: string,
+  playerId: string,
+  reason: string,
+): Promise<void> {
+  const sockets = await io.in(roomKey).fetchSockets();
+
+  for (const socket of sockets) {
+    const user = socket.data.user as SocketUser | undefined;
+    if (user?.id !== playerId) continue;
+
+    socket.emit(SERVER_EVENT.kicked, { reason });
+    socket.disconnect(true);
+  }
 }
 
 /** Каждому своё состояние: вопрос в фазе READY виден только ведущему. */
@@ -200,7 +303,9 @@ async function broadcastState(io: IOServer, managed: ManagedRoom) {
   for (const socket of sockets) {
     const user = socket.data.user as SocketUser | undefined;
     if (!user) continue;
-    socket.emit(SERVER_EVENT.state, buildState(managed, user.id));
+
+    const code = socket.data.roomCode as string | null | undefined;
+    socket.emit(SERVER_EVENT.state, buildState(managed, user.id, code ?? null));
   }
 }
 
@@ -241,6 +346,14 @@ function readBet(payload: unknown): unknown {
     return (payload as { bet: unknown }).bet;
   }
   return payload;
+}
+
+/** Достать строковое поле из полезной нагрузки события. */
+function readString(payload: unknown, field: string): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+
+  const value = (payload as Record<string, unknown>)[field];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function readText(payload: unknown): string | null {

@@ -118,6 +118,40 @@ model RoomQuestionQueue {
   @@map("room_question_queues")
 }
 
+/// Чем заканчивается партия в приватной комнате.
+enum RoomEndMode {
+  /// Играем, пока хост не остановит.
+  ENDLESS
+  /// До заданного числа раундов.
+  ROUNDS
+  /// Пока кто-нибудь не наберёт заданное число очков.
+  POINTS
+}
+
+/// Приватная комната: счёт внутри неё наружу не уходит (см. docs/SPEC.md §3.2).
+model PrivateRoom {
+  id String @id @default(cuid())
+  /// Короткий код из ссылки-приглашения.
+  code String @unique
+
+  hostId String
+  host   User   @relation("HostedRooms", fields: [hostId], references: [id], onDelete: Cascade)
+
+  /// Длительность фазы ставок, мс.
+  bettingMs    Int         @default(300000)
+  includeAdult Boolean     @default(true)
+  endMode      RoomEndMode @default(ENDLESS)
+  /// Сколько раундов или очков до конца партии.
+  endValue Int?
+
+  createdAt DateTime @default(now())
+  /// Когда комната опустела. Через полчаса после этого её удаляют.
+  emptySince DateTime?
+
+  @@index([emptySince])
+  @@map("private_rooms")
+}
+
 /// Игрок. Регистрация — только логин и пароль, email не собираем,
 /// восстановления пароля нет (см. docs/SPEC.md §2).
 model User {
@@ -137,7 +171,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  hostedRounds Round[]    @relation("HostedRounds")
+  hostedRounds Round[]       @relation("HostedRounds")
+  hostedRooms  PrivateRoom[] @relation("HostedRooms")
   bets         RoundBet[]
   scores       Score[]
 

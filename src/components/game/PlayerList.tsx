@@ -1,8 +1,19 @@
+"use client";
+
 import { Avatar } from "@/components/Avatar";
 import type { PlayerPayload, RoomStatePayload } from "@/shared/protocol";
 
-export function PlayerList({ state }: { state: RoomStatePayload }) {
+export function PlayerList({
+  state,
+  onKick,
+}: {
+  state: RoomStatePayload;
+  /** Выгнать игрока: доступно только хозяину приватной комнаты. */
+  onKick?: (playerId: string) => void;
+}) {
   const ranked = [...state.players].sort((a, b) => b.score - a.score);
+  const youAreOwner =
+    state.ownerId !== null && state.ownerId === state.youId && Boolean(onKick);
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-4">
@@ -14,7 +25,7 @@ export function PlayerList({ state }: { state: RoomStatePayload }) {
         {ranked.map((player) => (
           <li
             key={player.id}
-            className={`flex items-center gap-3 rounded-xl px-2 py-1.5 ${
+            className={`group flex items-center gap-3 rounded-xl px-2 py-1.5 ${
               player.id === state.youId ? "bg-tint" : ""
             }`}
           >
@@ -30,7 +41,19 @@ export function PlayerList({ state }: { state: RoomStatePayload }) {
               <p className="text-xs text-muted">{status(player, state)}</p>
             </div>
 
-            <span className="tabular text-sm font-semibold text-crimson">
+            {youAreOwner && player.id !== state.youId && (
+              <button
+                type="button"
+                onClick={() => onKick?.(player.id)}
+                title={`Выгнать ${player.nickname}`}
+                aria-label={`Выгнать ${player.nickname}`}
+                className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted opacity-0 transition hover:text-crimson focus:opacity-100 group-hover:opacity-100"
+              >
+                ✕
+              </button>
+            )}
+
+            <span className="tabular shrink-0 text-sm font-semibold text-crimson">
               {player.score}
             </span>
           </li>
@@ -41,6 +64,9 @@ export function PlayerList({ state }: { state: RoomStatePayload }) {
 }
 
 function status(player: PlayerPayload, state: RoomStatePayload): string {
+  if (player.id === state.ownerId) {
+    return player.isHost ? "ведущий · хозяин" : "хозяин комнаты";
+  }
   if (player.isHost) return "ведущий";
 
   if (state.phase === "betting") {

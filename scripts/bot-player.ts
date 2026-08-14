@@ -4,6 +4,7 @@ import { randomAvatarId } from "../src/lib/avatars";
 import { prisma } from "../src/lib/prisma";
 import {
   CLIENT_EVENT,
+  ROOM_QUERY,
   SERVER_EVENT,
   SOCKET_PATH,
   type Ack,
@@ -16,9 +17,11 @@ import {
  * человеку было с кем крутить раунды.
  *
  *   npm run bot -- Маша
+ *   npm run bot -- Маша K7M2QX     # в приватную комнату по коду
  */
 const URL = process.env.BOT_URL ?? "http://localhost:3000";
 const nickname = process.argv[2] ?? "Бот Маша";
+const roomCode = process.argv[3];
 const login = `bot_${nickname.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "_")}`;
 
 const SUMS = [500, 5_000, 25_000, 150_000, 900_000, 5_000_000];
@@ -44,9 +47,12 @@ async function main() {
     path: SOCKET_PATH,
     transports: ["websocket"],
     extraHeaders: { Cookie: `pt_session=${token}` },
+    query: roomCode ? { [ROOM_QUERY]: roomCode } : undefined,
   });
 
-  socket.on("connect", () => console.log(`${nickname} за столом`));
+  socket.on("connect", () =>
+    console.log(`${nickname} за столом${roomCode ? ` (${roomCode})` : ""}`),
+  );
   socket.on("connect_error", (error: Error) =>
     console.error("не подключиться:", error.message),
   );

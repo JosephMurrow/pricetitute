@@ -18,12 +18,20 @@ export default async function Home() {
 
       {user ? (
         <div className="flex flex-col items-center gap-4">
-          <Link
-            href="/play"
-            className="rounded-xl bg-crimson px-8 py-3 text-lg font-semibold text-paper transition hover:bg-deep"
-          >
-            Играть
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/play"
+              className="rounded-xl bg-crimson px-8 py-3 text-lg font-semibold text-paper transition hover:bg-deep"
+            >
+              В общую комнату
+            </Link>
+            <Link
+              href="/rooms/new"
+              className="rounded-xl border border-line bg-paper px-8 py-3 text-lg font-semibold transition hover:border-crimson hover:text-crimson"
+            >
+              Своя комната
+            </Link>
+          </div>
 
           <Link
             href="/profile"

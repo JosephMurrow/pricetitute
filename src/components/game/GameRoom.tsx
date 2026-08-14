@@ -8,18 +8,23 @@ import type { RoomStatePayload } from "@/shared/protocol";
 import { BetInput } from "./BetInput";
 import { Chat } from "./Chat";
 import { Countdown } from "./Countdown";
+import { Finished } from "./Finished";
 import { PlayerList } from "./PlayerList";
 import { Reveal } from "./Reveal";
+import { RoomPanel } from "./RoomPanel";
 import { useGameRoom } from "./useGameRoom";
 
 export function GameRoom({
   nickname,
   avatarId,
+  roomCode,
 }: {
   nickname: string;
   avatarId: number;
+  /** Код приватной комнаты; без него садимся в общую. */
+  roomCode?: string;
 }) {
-  const room = useGameRoom();
+  const room = useGameRoom(roomCode);
   const state = room.state;
 
   return (
@@ -49,7 +54,27 @@ export function GameRoom({
         </div>
       </header>
 
-      {!room.connected && (
+      {room.kicked ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <p className="text-lg font-semibold">{room.kicked}</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/play"
+              className="rounded-lg bg-crimson px-5 py-2.5 text-sm font-semibold text-paper transition hover:bg-deep"
+            >
+              В общую комнату
+            </Link>
+            <Link
+              href="/rooms/new"
+              className="rounded-lg border border-line bg-paper px-5 py-2.5 text-sm font-semibold transition hover:border-crimson hover:text-crimson"
+            >
+              Создать свою
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {!room.connected && !room.kicked && (
         <p className="rounded-xl border border-line bg-paper px-4 py-2.5 text-center text-sm text-muted">
           Связь с сервером потеряна, восстанавливаем…
         </p>
@@ -61,7 +86,7 @@ export function GameRoom({
         </p>
       )}
 
-      {state === null ? (
+      {room.kicked ? null : state === null ? (
         <p className="flex flex-1 items-center justify-center text-sm text-muted">
           Заходим в комнату…
         </p>
@@ -75,11 +100,16 @@ export function GameRoom({
               onRead={room.confirmRead}
               onAnswer={room.submitAnswer}
               onBet={room.placeBet}
+              onRestart={() => void room.restart()}
             />
           </section>
 
           <aside className="flex flex-col gap-4">
-            <PlayerList state={state} />
+            <RoomPanel state={state} />
+            <PlayerList
+              state={state}
+              onKick={(playerId) => void room.kick(playerId)}
+            />
             <Chat
               messages={room.chat}
               youId={state.youId}
@@ -124,7 +154,9 @@ function PhaseCard({
 }
 
 function QuestionCard({ state }: { state: RoomStatePayload }) {
-  if (state.phase === "waiting") return null;
+  // В перерыве и на финальном экране вопроса нет вовсе — заглушка «его видит
+  // только ведущий» там смотрелась бы враньём.
+  if (state.phase === "waiting" || state.phase === "finished") return null;
 
   if (state.question === null) {
     return (
@@ -153,11 +185,13 @@ function ActionArea({
   onRead,
   onAnswer,
   onBet,
+  onRestart,
 }: {
   state: RoomStatePayload;
   onRead: () => Promise<void>;
   onAnswer: (bet: Bet) => Promise<void>;
   onBet: (bet: Bet) => Promise<void>;
+  onRestart: () => void;
 }) {
   const isHost = state.hostId === state.youId;
   const you = state.players.find((player) => player.id === state.youId);
@@ -221,6 +255,9 @@ function ActionArea({
 
     case "reveal":
       return <Reveal state={state} />;
+
+    case "finished":
+      return <Finished state={state} onRestart={onRestart} />;
   }
 }
 
@@ -244,5 +281,7 @@ function title(state: RoomStatePayload, isHost: boolean): string {
       return isHost ? "Ставки идут" : "Угадай сумму";
     case "reveal":
       return "Вскрываем";
+    case "finished":
+      return "Партия окончена";
   }
 }

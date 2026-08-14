@@ -6,12 +6,14 @@ import { registerAction } from "@/lib/auth/actions";
 import { EMPTY_FORM_STATE } from "@/lib/auth/form-state";
 import { Field, FormError, SubmitButton } from "@/components/ui/form";
 
-export function RegisterForm() {
+export function RegisterForm({ next }: { next?: string }) {
   const [state, formAction] = useActionState(registerAction, EMPTY_FORM_STATE);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <FormError>{state.error}</FormError>
+
+      {next && <input type="hidden" name="next" value={next} />}
 
       <Field
         label="Логин"

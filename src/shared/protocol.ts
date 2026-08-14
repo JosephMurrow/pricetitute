@@ -1,5 +1,5 @@
 import type { Bet } from "@/lib/game/bet";
-import type { PauseReason, Phase } from "@/lib/game/room";
+import type { EndMode, PauseReason, Phase } from "@/lib/game/room";
 
 /**
  * Контракт сокетов: типы делят клиент и сервер, поэтому здесь не должно быть
@@ -25,7 +25,14 @@ export const CLIENT_EVENT = {
   answer: "round:answer",
   bet: "round:bet",
   chat: "chat:send",
+  /** Хозяин приватной комнаты выгоняет игрока. */
+  kick: "room:kick",
+  /** Хозяин начинает новую партию после финального экрана. */
+  restart: "room:restart",
 } as const;
+
+/** Имя параметра подключения с кодом приватной комнаты. */
+export const ROOM_QUERY = "room";
 
 export interface PlayerPayload {
   id: string;
@@ -75,6 +82,16 @@ export interface RoomStatePayload {
   reveal: RevealPayload | null;
   /** Почему комната стоит: только в фазе ожидания. */
   pauseReason: PauseReason | null;
+  /** Победители партии: только на финальном экране. */
+  winners: string[] | null;
+  /** Сыграно раундов в текущей партии. */
+  roundsPlayed: number;
+  endMode: EndMode;
+  endValue: number | null;
+  /** Хозяин приватной комнаты; в общей — null. */
+  ownerId: string | null;
+  /** Код приватной комнаты для ссылки-приглашения; в общей — null. */
+  roomCode: string | null;
   /** Идентификатор получателя — клиенту удобнее не гадать, кто из игроков он. */
   youId: string;
 }
