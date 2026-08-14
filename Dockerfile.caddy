@@ -1,0 +1,10 @@
+# Caddy со встроенным провайдером DuckDNS.
+#
+# Обычная проверка Let's Encrypt ходит на порт 80, а он занят другим сервисом,
+# поэтому сертификат выпускается по DNS-записи: Caddy сам создаёт временную
+# TXT-запись через API DuckDNS. Порты для этого не нужны.
+FROM caddy:2-builder AS builder
+RUN xcaddy build --with github.com/caddy-dns/duckdns
+
+FROM caddy:2
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

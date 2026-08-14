@@ -1,4 +1,4 @@
-# Боевой запуск: приложение и база в одном стеке.
+# Боевой запуск: база, приложение и обратный прокси одним стеком.
 # Секреты берутся из .env рядом с этим файлом (см. .env.prod.example).
 services:
   postgres:
@@ -29,9 +29,32 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       SESSION_SECRET: ${SESSION_SECRET}
+    # Наружу приложение не публикуем — только на петлю самого LXC, чтобы можно
+    # было проверить его руками в обход прокси.
     ports:
-      # Слушаем только на самом контейнере LXC: наружу пускает обратный прокси.
-      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+      - "127.0.0.1:3000:3000"
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Здесь лежат выпущенные сертификаты — том обязателен, иначе при каждом
+      # пересоздании контейнера Let's Encrypt будет выпускать их заново и
+      # быстро упрётся в лимиты.
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   db-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,11 @@
+{$DOMAIN} {
+	# Сертификат выпускается по DNS-записи: порт 80 занят соседним сервисом.
+	tls {
+		dns duckdns {$DUCKDNS_TOKEN}
+	}
+
+	encode zstd gzip
+
+	# Вебсокеты Socket.IO проходят насквозь: Caddy сам пробрасывает upgrade.
+	reverse_proxy app:3000
+}

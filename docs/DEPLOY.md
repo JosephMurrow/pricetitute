@@ -18,23 +18,33 @@ Railway, Render, Fly, обычный VPS. **Vercel не подойдёт** — �
 
 ## Порядок выкладки
 
-```bash
-docker build -t platitutka .
-docker run --rm -e DATABASE_URL=... platitutka npx prisma migrate deploy
-docker run -d -p 3000:3000 -e DATABASE_URL=... -e SESSION_SECRET=... platitutka
-```
-
-Миграции идут **отдельной командой до запуска**, а не на старте процесса: если
-инстансов больше одного, они подерутся за одну и ту же миграцию.
-
-Пул вопросов заливается один раз:
+Готовый стек — `docker-compose.prod.yml`: база, приложение и Caddy как
+обратный прокси. Настройки берутся из `.env` рядом с ним, образец —
+`.env.prod.example`.
 
 ```bash
-docker run --rm -e DATABASE_URL=... platitutka npx prisma db seed
+cp .env.prod.example .env   # и заполнить пароли, секрет и токен
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec app npx prisma migrate deploy
+docker compose -f docker-compose.prod.yml exec app npx prisma db seed
 ```
+
+Миграции идут **отдельной командой после запуска**, а не на старте процесса:
+если инстансов больше одного, они подерутся за одну и ту же миграцию.
 
 Сид безопасен при повторном запуске: `createMany` со `skipDuplicates` не
 плодит копии и добавляет только новые вопросы.
+
+### Сертификат без порта 80
+
+Caddy собран с провайдером DuckDNS и выпускает сертификат **по DNS-записи**, а
+не по обращению на порт 80. Это нужно, когда 80 и 443 снаружи заняты другим
+сервисом и наружу проброшен нестандартный порт: обычная проверка Let's Encrypt
+в таких условиях не проходит, а DNS-проверке порты не нужны вовсе.
+
+Том `caddy-data` обязателен: в нём лежат выпущенные сертификаты. Без него
+каждое пересоздание контейнера заказывает их заново, и Let's Encrypt довольно
+быстро упирается в недельный лимит на имя.
 
 ## Ограничение: один процесс
 
