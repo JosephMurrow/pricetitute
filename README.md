@@ -6,6 +6,7 @@
 - Правила и функционал — [docs/SPEC.md](docs/SPEC.md)
 - План работ — [docs/ROADMAP.md](docs/ROADMAP.md)
 - Выкладка — [docs/DEPLOY.md](docs/DEPLOY.md)
+- Что дальше — [docs/BACKLOG.md](docs/BACKLOG.md)
 
 ## Стек
 
