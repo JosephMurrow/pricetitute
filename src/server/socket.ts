@@ -12,6 +12,10 @@ export function createSocketServer(httpServer: HttpServer): IOServer {
   const io = new IOServer(httpServer, {
     path: SOCKET_PATH,
     serveClient: false,
+    // Engine.IO по умолчанию добивает upgrade-запросы, которые не попали в его
+    // путь. В одном процессе с Next это убивает HMR-сокет, поэтому чужие
+    // upgrade'ы оставляем в покое — их разбирает обработчик в server.ts.
+    destroyUpgrade: false,
   });
 
   io.on("connection", (socket) => {
