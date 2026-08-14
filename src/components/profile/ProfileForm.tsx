@@ -45,7 +45,7 @@ export function ProfileForm({
               aria-pressed={selected === id}
               className={`rounded-full transition ${
                 selected === id
-                  ? "ring-2 ring-hot ring-offset-2 ring-offset-surface"
+                  ? "ring-2 ring-crimson ring-offset-2 ring-offset-paper"
                   : "opacity-70 hover:opacity-100"
               }`}
             >
@@ -54,7 +54,9 @@ export function ProfileForm({
           ))}
         </div>
         {state.fieldErrors?.avatarId && (
-          <p className="mt-1 text-xs text-hot">{state.fieldErrors.avatarId}</p>
+          <p className="mt-1 text-xs text-crimson">
+            {state.fieldErrors.avatarId}
+          </p>
         )}
       </div>
 

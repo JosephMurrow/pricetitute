@@ -56,6 +56,8 @@ export interface RoomStatePayload {
   phase: Phase;
   /** Абсолютное время конца фазы, unix ms. */
   deadline: number | null;
+  /** Полная длительность фазы: по ней рисуется шкала обратного отсчёта. */
+  phaseDurationMs: number | null;
   /**
    * Время сервера в момент отправки. Часы клиента врут, поэтому обратный
    * отсчёт считается как deadline − serverTime, а не по локальному времени.

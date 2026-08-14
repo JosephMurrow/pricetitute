@@ -1,37 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  /* Фон и поверхности */
-  --color-ink: #0b0b10;
-  --color-surface: #16161f;
-  --color-surface-2: #1e1e29;
-  --color-line: #2c2c3a;
+  /* Фон и поверхности: белое с розовым подтоном */
+  --color-blush: #fff5f8;
+  --color-paper: #ffffff;
+  --color-tint: #ffe9ef;
+  --color-line: #f7cbd9;
 
   /* Текст */
-  --color-body: #ededf2;
-  --color-muted: #8b8b9e;
+  --color-ink: #2a0912;
+  --color-muted: #96697a;
 
-  /* Акценты: деньги и провокация */
-  --color-money: #5ce68a;
-  --color-money-dim: #2f7a4c;
-  --color-hot: #ff3d8b;
-  --color-warn: #ffb43d;
+  /* Акценты */
+  --color-crimson: #d31450;
+  --color-deep: #8e0a34;
+  --color-rose: #ff5c93;
+  --color-gold: #dd9a24;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background-color: var(--color-ink);
-  color: var(--color-body);
+  background-color: var(--color-blush);
+  color: var(--color-ink);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Суммы всегда моноширинными, чтобы разряды не прыгали при отсчёте */
+/* Суммы моноширинными, чтобы разряды не прыгали при отсчёте */
 .tabular {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;

@@ -160,6 +160,7 @@ export function buildState(
     roomKey: managed.key,
     phase: view.phase,
     deadline: view.deadline,
+    phaseDurationMs: view.phaseDurationMs,
     serverTime: Date.now(),
     hostId: view.hostId,
     question: questionVisible ? (managed.question?.text ?? null) : null,

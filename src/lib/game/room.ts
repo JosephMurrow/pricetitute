@@ -91,6 +91,8 @@ export interface RoomView {
   phase: Phase;
   /** Абсолютное время окончания фазы, unix ms. null — фаза без таймера. */
   deadline: number | null;
+  /** Полная длительность текущей фазы: клиенту нужна для шкалы отсчёта. */
+  phaseDurationMs: number | null;
   hostId: string | null;
   questionId: string | null;
   /** В фазе READY текст вопроса уходит только ведущему. */
@@ -271,6 +273,7 @@ export class Room {
       key: this.key,
       phase: this.phase,
       deadline: this.deadline,
+      phaseDurationMs: this.phaseDuration(),
       hostId: this.hostId,
       questionId: this.questionId,
       questionVisibleToAll:
@@ -425,6 +428,21 @@ export class Room {
     this.hostAnswer = null;
     this.bets.clear();
     this.reveal = null;
+  }
+
+  private phaseDuration(): number | null {
+    switch (this.phase) {
+      case "ready":
+        return this.timings.readyMs;
+      case "host_answer":
+        return this.timings.hostAnswerMs;
+      case "betting":
+        return this.timings.bettingMs;
+      case "reveal":
+        return this.timings.revealMs;
+      case "waiting":
+        return null;
+    }
   }
 
   private statsFor(playerId: string): PlayerStats {

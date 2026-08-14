@@ -27,14 +27,16 @@ export function Field({
         type={type}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
-        className={`w-full rounded-lg border bg-surface-2 px-3 py-2.5 text-body outline-none transition placeholder:text-muted focus:border-hot ${
-          error ? "border-hot" : "border-line"
+        className={`w-full rounded-lg border bg-blush px-3 py-2.5 text-ink outline-none transition placeholder:text-muted focus:border-crimson ${
+          error ? "border-crimson" : "border-line"
         }`}
       />
       {hint && !error && (
         <span className="mt-1 block text-xs text-muted">{hint}</span>
       )}
-      {error && <span className="mt-1 block text-xs text-hot">{error}</span>}
+      {error && (
+        <span className="mt-1 block text-xs text-crimson">{error}</span>
+      )}
     </label>
   );
 }
@@ -46,7 +48,7 @@ export function SubmitButton({ children }: { children: React.ReactNode }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-hot px-4 py-2.5 font-semibold text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+      className="w-full rounded-lg bg-crimson px-4 py-2.5 font-semibold text-paper transition hover:bg-deep disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Секунду…" : children}
     </button>
@@ -57,7 +59,7 @@ export function FormError({ children }: { children?: string }) {
   if (!children) return null;
 
   return (
-    <p className="rounded-lg border border-hot/40 bg-hot/10 px-3 py-2 text-sm text-hot">
+    <p className="rounded-lg border border-crimson/30 bg-tint px-3 py-2 text-sm text-deep">
       {children}
     </p>
   );
@@ -67,7 +69,7 @@ export function FormOk({ children }: { children?: string }) {
   if (!children) return null;
 
   return (
-    <p className="rounded-lg border border-money/40 bg-money/10 px-3 py-2 text-sm text-money">
+    <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-gold">
       {children}
     </p>
   );
