@@ -15,6 +15,7 @@ import {
   type RoomStatePayload,
 } from "../shared/protocol";
 import { authenticateSocket, type SocketUser } from "./auth";
+import { BotDirector } from "./bots/director";
 import { RateLimiter } from "./rate-limit";
 import {
   GLOBAL_SETUP,
@@ -45,6 +46,17 @@ export function createSocketServer(httpServer: HttpServer): IOServer {
     void broadcastState(io, managed);
   });
 
+  const director = new BotDirector(manager, {
+    sendChat: (roomKey, message) => {
+      const managed = manager.get(roomKey);
+      if (!managed) return;
+
+      pushChat(managed, message);
+      io.to(roomKey).emit(SERVER_EVENT.chatMessage, message);
+    },
+  });
+  director.start();
+
   io.use((socket, next) => {
     void authenticateSocket(socket.handshake.headers)
       .then((user) => {
@@ -62,7 +74,7 @@ export function createSocketServer(httpServer: HttpServer): IOServer {
   });
 
   io.on("connection", (socket) => {
-    void onConnection(io, manager, socket);
+    void onConnection(io, manager, director, socket);
   });
 
   startRoomCleanup(manager);
@@ -106,6 +118,7 @@ async function resolveRoom(
 async function onConnection(
   io: IOServer,
   manager: RoomManager,
+  director: BotDirector,
   socket: Socket,
 ): Promise<void> {
   const user = socket.data.user as SocketUser | undefined;
@@ -128,8 +141,11 @@ async function onConnection(
 
   socket.data.roomCode = roomCode;
   socket.emit(SERVER_EVENT.chatHistory, managed.chat);
-  socket.emit(SERVER_EVENT.state, buildState(managed, user.id, roomCode));
-  void broadcastState(io, managed);
+  socket.emit(
+    SERVER_EVENT.state,
+    buildState(managed, user.id, roomCode, director.hasParty(roomKey)),
+  );
+  void broadcastState(io, managed, director);
 
   socket.on(CLIENT_EVENT.read, (...args: unknown[]) => {
     respond(args, () => {
@@ -218,9 +234,37 @@ async function onConnection(
     );
   });
 
+  socket.on(CLIENT_EVENT.fillBots, (...args: unknown[]) => {
+    void respondAsync(args, async () => {
+      if (!target.setup.isPrivate) {
+        return {
+          accepted: false,
+          reason: "Боты приходят только в свою комнату",
+        };
+      }
+      if (managed.room.view().ownerId !== user.id) {
+        return { accepted: false, reason: "Звать ботов может только хозяин" };
+      }
+      if (managed.connections.size > 1) {
+        return { accepted: false, reason: "В комнате уже есть живые игроки" };
+      }
+      if (director.hasParty(roomKey)) {
+        return { accepted: false, reason: "Боты уже здесь" };
+      }
+
+      const added = await director.fill(roomKey);
+      if (added === 0) {
+        return { accepted: false, reason: "Не удалось позвать ботов" };
+      }
+
+      void broadcastState(io, managed, director);
+      return { accepted: true };
+    });
+  });
+
   socket.on("disconnect", () => {
     manager.leave(user, roomKey);
-    void broadcastState(io, managed);
+    void broadcastState(io, managed, director);
   });
 }
 
@@ -229,6 +273,7 @@ export function buildState(
   managed: ManagedRoom,
   viewerId: string,
   roomCode: string | null = null,
+  botsPresent = false,
 ): RoomStatePayload {
   const view = managed.room.view();
   // В фазе READY вопрос знает только ведущий.
@@ -274,6 +319,12 @@ export function buildState(
     endValue: view.endValue,
     ownerId: view.ownerId,
     roomCode,
+    // Кнопка «Forever alone» — только хозяину пустой приватной комнаты.
+    canInviteBots:
+      managed.setup.isPrivate &&
+      view.ownerId === viewerId &&
+      managed.connections.size === 1 &&
+      !botsPresent,
     youId: viewerId,
   };
 }
@@ -297,15 +348,23 @@ async function disconnectPlayer(
 }
 
 /** Каждому своё состояние: вопрос в фазе READY виден только ведущему. */
-async function broadcastState(io: IOServer, managed: ManagedRoom) {
+async function broadcastState(
+  io: IOServer,
+  managed: ManagedRoom,
+  director?: BotDirector,
+) {
   const sockets = await io.in(managed.key).fetchSockets();
+  const botsPresent = director?.hasParty(managed.key) ?? false;
 
   for (const socket of sockets) {
     const user = socket.data.user as SocketUser | undefined;
     if (!user) continue;
 
     const code = socket.data.roomCode as string | null | undefined;
-    socket.emit(SERVER_EVENT.state, buildState(managed, user.id, code ?? null));
+    socket.emit(
+      SERVER_EVENT.state,
+      buildState(managed, user.id, code ?? null, botsPresent),
+    );
   }
 }
 
@@ -327,6 +386,29 @@ function respond(
   let result: HandlerResult;
   try {
     result = handler(payload);
+  } catch (error) {
+    console.error("[socket] действие упало:", error);
+    result = { accepted: false, reason: "Что-то сломалось на сервере" };
+  }
+
+  ack?.(
+    result.accepted ? { ok: true } : { ok: false, error: result.reason ?? "" },
+  );
+}
+
+/** То же, что respond, но для действий, которым нужен поход в базу. */
+async function respondAsync(
+  args: unknown[],
+  handler: (payload: unknown) => Promise<HandlerResult>,
+): Promise<void> {
+  const ack = args.find(
+    (arg): arg is (result: Ack) => void => typeof arg === "function",
+  );
+  const payload = args.find((arg) => typeof arg !== "function");
+
+  let result: HandlerResult;
+  try {
+    result = await handler(payload);
   } catch (error) {
     console.error("[socket] действие упало:", error);
     result = { accepted: false, reason: "Что-то сломалось на сервере" };

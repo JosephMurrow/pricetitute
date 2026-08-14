@@ -101,6 +101,7 @@ export function GameRoom({
               onAnswer={room.submitAnswer}
               onBet={room.placeBet}
               onRestart={() => void room.restart()}
+              onInviteBots={() => void room.inviteBots()}
             />
           </section>
 
@@ -186,12 +187,14 @@ function ActionArea({
   onAnswer,
   onBet,
   onRestart,
+  onInviteBots,
 }: {
   state: RoomStatePayload;
   onRead: () => Promise<void>;
   onAnswer: (bet: Bet) => Promise<void>;
   onBet: (bet: Bet) => Promise<void>;
   onRestart: () => void;
+  onInviteBots: () => void;
 }) {
   const isHost = state.hostId === state.youId;
   const you = state.players.find((player) => player.id === state.youId);
@@ -199,11 +202,29 @@ function ActionArea({
   switch (state.phase) {
     case "waiting":
       return (
-        <Notice>
-          {state.pauseReason === "no_questions"
-            ? "Вопросы в пуле кончились. Скоро подвезём новые."
-            : "Ждём второго игрока — вдвоём уже можно начинать."}
-        </Notice>
+        <div className="flex flex-col gap-3">
+          <Notice>
+            {state.pauseReason === "no_questions"
+              ? "Вопросы в пуле кончились. Скоро подвезём новые."
+              : "Ждём второго игрока — вдвоём уже можно начинать."}
+          </Notice>
+
+          {state.canInviteBots && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5 text-center">
+              <p className="text-sm text-muted">
+                Никого нет, а играть хочется? Позови десяток ботов. Они уйдут
+                сами, как только к тебе присоединится живой человек.
+              </p>
+              <button
+                type="button"
+                onClick={onInviteBots}
+                className="rounded-xl bg-crimson px-4 py-3 font-semibold text-paper transition hover:bg-deep"
+              >
+                Forever alone
+              </button>
+            </div>
+          )}
+        </div>
       );
 
     case "ready":

@@ -32,6 +32,8 @@ export interface GameRoomHandle {
   kick: (playerId: string) => Promise<void>;
   /** Хозяин начинает новую партию после финального экрана. */
   restart: () => Promise<void>;
+  /** «Forever alone»: позвать в комнату ботов. */
+  inviteBots: () => Promise<void>;
 }
 
 /**
@@ -149,6 +151,10 @@ export function useGameRoom(roomCode?: string): GameRoomHandle {
     await act(CLIENT_EVENT.restart);
   }, [act]);
 
+  const inviteBots = useCallback(async () => {
+    await act(CLIENT_EVENT.fillBots);
+  }, [act]);
+
   return {
     state,
     chat,
@@ -162,5 +168,6 @@ export function useGameRoom(roomCode?: string): GameRoomHandle {
     sendChat,
     kick,
     restart,
+    inviteBots,
   };
 }

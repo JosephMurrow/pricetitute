@@ -108,13 +108,14 @@ export async function loginAction(
 
   const user = await prisma.user.findUnique({
     where: { login: normalizeLogin(parsed.data.login) },
-    select: { id: true, passwordHash: true },
+    select: { id: true, passwordHash: true, isBot: true },
   });
 
   // Одинаковый текст на неизвестный логин и на неверный пароль: не подсказываем,
   // какие логины заняты.
   const wrong: FormState = { values, error: "Неверный логин или пароль" };
-  if (!user) return wrong;
+  // Боты «Forever alone» — обычные записи в таблице, но входить под ними нельзя.
+  if (!user || user.isBot) return wrong;
 
   const passwordOk = await verify(user.passwordHash, parsed.data.password);
   if (!passwordOk) return wrong;

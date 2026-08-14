@@ -29,6 +29,8 @@ export const CLIENT_EVENT = {
   kick: "room:kick",
   /** Хозяин начинает новую партию после финального экрана. */
   restart: "room:restart",
+  /** «Forever alone»: набить комнату ботами. */
+  fillBots: "room:bots",
 } as const;
 
 /** Имя параметра подключения с кодом приватной комнаты. */
@@ -92,6 +94,11 @@ export interface RoomStatePayload {
   ownerId: string | null;
   /** Код приватной комнаты для ссылки-приглашения; в общей — null. */
   roomCode: string | null;
+  /**
+   * Можно ли позвать ботов: только хозяину пустой приватной комнаты. Как
+   * только заходит живой игрок, кнопка пропадает.
+   */
+  canInviteBots: boolean;
   /** Идентификатор получателя — клиенту удобнее не гадать, кто из игроков он. */
   youId: string;
 }
