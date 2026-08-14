@@ -8,7 +8,15 @@ import { prisma } from "./prisma";
  * За всё время счёт берётся из накопленной таблицы Score, за неделю —
  * пересчитывается по раундам, иначе пришлось бы держать отдельный счётчик на
  * каждый период.
+ *
+ * Боты из режима «Forever alone» отсекаются явно. Сейчас они и так не могут
+ * попасть сюда — играют только в приватных комнатах, — но рейтинг не должен
+ * зависеть от этого совпадения: стоит однажды пустить бота в общую комнату,
+ * и он окажется в таблице.
  */
+
+/** Только живые игроки: боты в зачёт не идут. */
+const HUMAN = { isBot: false } as const;
 
 export type LeaderboardPeriod = "all" | "week";
 
@@ -54,7 +62,7 @@ function compare(a: LeaderboardRow, b: LeaderboardRow): number {
 async function loadAllTime(viewerId: string): Promise<Leaderboard> {
   const [scores, total] = await Promise.all([
     prisma.score.findMany({
-      where: { roomKey: GLOBAL_ROOM, roundsPlayed: { gt: 0 } },
+      where: { roomKey: GLOBAL_ROOM, roundsPlayed: { gt: 0 }, user: HUMAN },
       orderBy: [{ points: "desc" }, { roundsPlayed: "asc" }],
       take: TOP_SIZE,
       select: {
@@ -65,7 +73,7 @@ async function loadAllTime(viewerId: string): Promise<Leaderboard> {
       },
     }),
     prisma.score.count({
-      where: { roomKey: GLOBAL_ROOM, roundsPlayed: { gt: 0 } },
+      where: { roomKey: GLOBAL_ROOM, roundsPlayed: { gt: 0 }, user: HUMAN },
     }),
   ]);
 
@@ -97,6 +105,7 @@ async function loadAllTime(viewerId: string): Promise<Leaderboard> {
         where: {
           roomKey: GLOBAL_ROOM,
           roundsPlayed: { gt: 0 },
+          user: HUMAN,
           OR: [
             { points: { gt: mine.points } },
             {
@@ -128,17 +137,17 @@ async function loadWeek(viewerId: string): Promise<Leaderboard> {
   const [wins, bets, hosted] = await Promise.all([
     prisma.roundBet.groupBy({
       by: ["playerId"],
-      where: { won: true, round: inWeek },
+      where: { won: true, round: inWeek, player: HUMAN },
       _count: { _all: true },
     }),
     prisma.roundBet.groupBy({
       by: ["playerId"],
-      where: { round: inWeek },
+      where: { round: inWeek, player: HUMAN },
       _count: { _all: true },
     }),
     prisma.round.groupBy({
       by: ["hostId"],
-      where: inWeek,
+      where: { ...inWeek, host: HUMAN },
       _count: { _all: true },
     }),
   ]);
