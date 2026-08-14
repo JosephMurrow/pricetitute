@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BRAND, Brand } from "@/components/Brand";
 import { CreateRoomForm } from "@/components/rooms/CreateRoomForm";
+import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -17,10 +18,11 @@ export default async function NewRoomPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-      <header className="mb-6">
+      <header className="mb-6 flex items-center justify-between gap-3">
         <Link href="/">
           <Brand className="text-xl" />
         </Link>
+        <UserMenu nickname={user.nickname} avatarId={user.avatarId} />
       </header>
 
       <h1 className="mb-1 text-2xl font-bold">Своя комната</h1>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BRAND, Brand } from "@/components/Brand";
 import { ProfileForm } from "@/components/profile/ProfileForm";
-import { logoutAction } from "@/lib/auth/actions";
+import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -24,37 +24,7 @@ export default async function ProfilePage() {
           <Brand className="text-xl" />
         </Link>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/leaderboard"
-            className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-muted transition hover:border-crimson hover:text-crimson"
-          >
-            Рейтинг
-          </Link>
-
-          <Link
-            href="/rooms/new"
-            className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-muted transition hover:border-crimson hover:text-crimson"
-          >
-            Своя комната
-          </Link>
-
-          <Link
-            href="/play"
-            className="rounded-lg bg-crimson px-3 py-1.5 text-sm font-semibold text-paper transition hover:bg-deep"
-          >
-            Играть
-          </Link>
-
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-muted transition hover:border-crimson hover:text-crimson"
-            >
-              Выйти
-            </button>
-          </form>
-        </div>
+        <UserMenu nickname={user.nickname} avatarId={user.avatarId} />
       </div>
 
       <div className="mb-6 flex items-center gap-4 rounded-2xl border border-line bg-paper p-5">

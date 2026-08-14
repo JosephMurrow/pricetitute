@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
 import { Brand } from "@/components/Brand";
+import { UserMenu } from "@/components/UserMenu";
 import type { Bet } from "@/lib/game/bet";
 import type { RoomStatePayload } from "@/shared/protocol";
 import { BetInput } from "./BetInput";
@@ -34,24 +34,7 @@ export function GameRoom({
           <Brand className="text-xl" />
         </Link>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/leaderboard"
-            className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-muted transition hover:border-crimson hover:text-crimson"
-          >
-            Рейтинг
-          </Link>
-
-          <Link
-            href="/profile"
-            className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-1.5 transition hover:border-crimson"
-          >
-            <Avatar id={avatarId} size={28} />
-            <span className="max-w-32 truncate text-sm font-medium">
-              {nickname}
-            </span>
-          </Link>
-        </div>
+        <UserMenu nickname={nickname} avatarId={avatarId} />
       </header>
 
       {room.kicked ? (

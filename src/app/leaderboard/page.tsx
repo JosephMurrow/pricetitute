@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { BRAND, Brand } from "@/components/Brand";
+import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUser } from "@/lib/auth/session";
 import {
   loadLeaderboard,
@@ -35,12 +36,7 @@ export default async function LeaderboardPage({
         <Link href="/">
           <Brand className="text-xl" />
         </Link>
-        <Link
-          href="/play"
-          className="rounded-lg bg-crimson px-3 py-1.5 text-sm font-semibold text-paper transition hover:bg-deep"
-        >
-          Играть
-        </Link>
+        <UserMenu nickname={user.nickname} avatarId={user.avatarId} />
       </header>
 
       <h1 className="mb-1 text-2xl font-bold">Рейтинг общей комнаты</h1>
