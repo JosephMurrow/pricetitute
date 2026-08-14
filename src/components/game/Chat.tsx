@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { CHAT_MAX_LENGTH, type ChatMessagePayload } from "@/shared/protocol";
 
+/** Запас в пикселях, в пределах которого лента считается прокрученной вниз. */
+const BOTTOM_SLACK = 24;
+
 export function Chat({
   messages,
   youId,
@@ -15,11 +18,35 @@ export function Chat({
 }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [seenCount, setSeenCount] = useState(messages.length);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
+  // Пока человек внизу ленты, прочитанным считается всё. Подстройка состояния
+  // прямо в рендере — штатный приём React, эффект здесь был бы лишним.
+  if (atBottom && seenCount !== messages.length) {
+    setSeenCount(messages.length);
+  }
+
+  const unreadCount = Math.max(0, messages.length - seenCount);
+  const unread = unreadCount > 0 ? messages.at(-1) : undefined;
+
+  // Прокручиваем только саму ленту и только когда человек и так внизу.
+  // Прежний scrollIntoView тащил за собой всю страницу, и на телефоне это
+  // выглядело как рывок вёрстки при каждом сообщении.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+    if (!atBottom) return;
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [messages.length, atBottom]);
+
+  function scrollToBottom() {
+    const list = listRef.current;
+    if (!list) return;
+
+    list.scrollTop = list.scrollHeight;
+    setAtBottom(true);
+  }
 
   async function submit() {
     const trimmed = text.trim();
@@ -28,7 +55,12 @@ export function Chat({
     setBusy(true);
     const sent = await onSend(trimmed);
     setBusy(false);
-    if (sent) setText("");
+
+    if (sent) {
+      setText("");
+      // Своё сообщение показываем всегда, даже если человек читал середину.
+      scrollToBottom();
+    }
   }
 
   return (
@@ -37,29 +69,52 @@ export function Chat({
         Чат
       </h2>
 
-      <div className="flex max-h-64 min-h-24 flex-1 flex-col gap-2 overflow-y-auto p-3 lg:max-h-none">
-        {messages.length === 0 && (
-          <p className="py-4 text-center text-xs text-muted">
-            Пока тихо. Скажи что-нибудь.
-          </p>
-        )}
-
-        {messages.map((message) => (
-          <div key={message.id} className="flex items-start gap-2">
-            <Avatar id={message.avatarId} size={24} className="mt-0.5" />
-            <p className="min-w-0 flex-1 break-words text-sm">
-              <span
-                className={`mr-1 font-medium ${
-                  message.playerId === youId ? "text-crimson" : "text-muted"
-                }`}
-              >
-                {message.nickname}
-              </span>
-              {message.text}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          onScroll={(event) => {
+            const list = event.currentTarget;
+            const bottom =
+              list.scrollHeight - list.scrollTop - list.clientHeight <=
+              BOTTOM_SLACK;
+            setAtBottom(bottom);
+          }}
+          className="flex max-h-64 min-h-24 flex-col gap-2 overflow-y-auto p-3 lg:max-h-80"
+        >
+          {messages.length === 0 && (
+            <p className="py-4 text-center text-xs text-muted">
+              Пока тихо. Скажи что-нибудь.
             </p>
-          </div>
-        ))}
-        <div ref={bottomRef} />
+          )}
+
+          {messages.map((message) => (
+            <div key={message.id} className="flex items-start gap-2">
+              <Avatar id={message.avatarId} size={24} className="mt-0.5" />
+              <p className="min-w-0 flex-1 break-words text-sm">
+                <span
+                  className={`mr-1 font-medium ${
+                    message.playerId === youId ? "text-crimson" : "text-muted"
+                  }`}
+                >
+                  {message.nickname}
+                </span>
+                {message.text}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {unread && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="absolute inset-x-3 bottom-2 truncate rounded-full bg-crimson px-3 py-1.5 text-xs font-medium text-paper shadow-lg transition hover:bg-deep"
+          >
+            {unreadCount > 1
+              ? `Новых сообщений: ${unreadCount}, последнее от «${unread.nickname}»`
+              : `Новое сообщение от «${unread.nickname}»`}
+          </button>
+        )}
       </div>
 
       <div className="flex gap-2 border-t border-line p-3">
