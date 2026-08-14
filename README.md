@@ -41,6 +41,8 @@ openssl rand -base64 48
 | `npm run typecheck`         | `tsc --noEmit`                                 |
 | `npm test`                  | Юнит-тесты на встроенном раннере Node          |
 | `npm run smoke:sockets`     | Два клиента играют раунд (нужен `npm run dev`) |
+| `npm run smoke:crowd`       | Толпа клиентов в общей комнате                 |
+| `npm run bot`               | Бот-напарник, чтобы играть в одиночку          |
 | `npm run db:up` / `db:down` | Postgres в docker-compose                      |
 | `npm run db:migrate`        | Миграция + перегенерация клиента               |
 | `npm run db:seed`           | Заливка пула вопросов                          |

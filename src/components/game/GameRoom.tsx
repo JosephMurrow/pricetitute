@@ -29,15 +29,24 @@ export function GameRoom({
           <Brand className="text-xl" />
         </Link>
 
-        <Link
-          href="/profile"
-          className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-1.5 transition hover:border-crimson"
-        >
-          <Avatar id={avatarId} size={28} />
-          <span className="max-w-32 truncate text-sm font-medium">
-            {nickname}
-          </span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/leaderboard"
+            className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-muted transition hover:border-crimson hover:text-crimson"
+          >
+            Рейтинг
+          </Link>
+
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-1.5 transition hover:border-crimson"
+          >
+            <Avatar id={avatarId} size={28} />
+            <span className="max-w-32 truncate text-sm font-medium">
+              {nickname}
+            </span>
+          </Link>
+        </div>
       </header>
 
       {!room.connected && (

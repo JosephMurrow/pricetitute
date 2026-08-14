@@ -8,7 +8,7 @@ import { readSessionToken, SESSION_COOKIE } from "@/lib/auth/token";
  * Файл называется proxy.ts, а не middleware.ts: в Next 16 старое соглашение
  * объявлено устаревшим.
  */
-const PROTECTED = ["/profile", "/play"];
+const PROTECTED = ["/profile", "/play", "/leaderboard"];
 const GUEST_ONLY = ["/login", "/register"];
 
 export async function proxy(request: NextRequest) {
@@ -32,5 +32,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/profile/:path*", "/play/:path*", "/login", "/register"],
+  matcher: [
+    "/profile/:path*",
+    "/play/:path*",
+    "/leaderboard/:path*",
+    "/login",
+    "/register",
+  ],
 };

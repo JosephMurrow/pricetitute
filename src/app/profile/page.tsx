@@ -26,6 +26,13 @@ export default async function ProfilePage() {
 
         <div className="flex items-center gap-2">
           <Link
+            href="/leaderboard"
+            className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-muted transition hover:border-crimson hover:text-crimson"
+          >
+            Рейтинг
+          </Link>
+
+          <Link
             href="/play"
             className="rounded-lg bg-crimson px-3 py-1.5 text-sm font-semibold text-paper transition hover:bg-deep"
           >
