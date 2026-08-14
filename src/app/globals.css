@@ -36,3 +36,26 @@ body {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
+
+/* Вскрышка проявляется по строчкам: ставки открываются одна за другой,
+   а не вываливаются стеной. */
+@keyframes reveal-row {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal-row {
+  animation: reveal-row 320ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-row {
+    animation: none;
+  }
+}

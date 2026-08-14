@@ -32,7 +32,13 @@ export { SOCKET_PATH };
 const actionLimiter = new RateLimiter(20, 5_000);
 const chatLimiter = new RateLimiter(5, 10_000);
 
-export function createSocketServer(httpServer: HttpServer): IOServer {
+export interface SocketServer {
+  io: IOServer;
+  /** Остановить таймеры комнат и ботов при выключении сервера. */
+  shutdown: () => void;
+}
+
+export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new IOServer(httpServer, {
     path: SOCKET_PATH,
     serveClient: false,
@@ -77,9 +83,17 @@ export function createSocketServer(httpServer: HttpServer): IOServer {
     void onConnection(io, manager, director, socket);
   });
 
-  startRoomCleanup(manager);
+  const stopCleanup = startRoomCleanup(manager);
 
-  return io;
+  return {
+    io,
+    shutdown: () => {
+      stopCleanup();
+      director.stop();
+      manager.closeAll();
+      io.close();
+    },
+  };
 }
 
 /**

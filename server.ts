@@ -37,12 +37,45 @@ async function main() {
     void handleUpgrade?.(req, socket, head);
   });
 
-  createSocketServer(httpServer);
+  const sockets = createSocketServer(httpServer);
 
   httpServer.listen(env.PORT, env.HOST, () => {
-    console.log(`▲ Pricetitute: http://${env.HOST}:${env.PORT}`);
+    console.log(`▲ Платитутка: http://${env.HOST}:${env.PORT}`);
     console.log(`  сокеты: ${SOCKET_PATH}, режим: ${dev ? "dev" : "prod"}`);
   });
+
+  installGuards(sockets.shutdown);
+}
+
+/**
+ * Игровое состояние живёт в памяти, поэтому падение процесса стоит дороже
+ * обычного: с ним пропадают все идущие раунды. Ошибку логируем и продолжаем
+ * работать, а по сигналу выключения гасим таймеры аккуратно.
+ */
+function installGuards(shutdown: () => void) {
+  process.on("unhandledRejection", (reason) => {
+    console.error("Необработанное отклонение промиса:", reason);
+  });
+
+  process.on("uncaughtException", (error) => {
+    console.error("Необработанное исключение:", error);
+  });
+
+  let closing = false;
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+      if (closing) return;
+      closing = true;
+
+      console.log(`Получен ${signal}, выключаемся`);
+      shutdown();
+
+      httpServer.close(() => process.exit(0));
+      // Если соединения не закрылись за пять секунд — выходим принудительно.
+      setTimeout(() => process.exit(0), 5000).unref();
+    });
+  }
 }
 
 main().catch((error) => {

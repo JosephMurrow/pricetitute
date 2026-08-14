@@ -37,16 +37,17 @@ export function Reveal({ state }: { state: RoomStatePayload }) {
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {sorted.map((bet) => {
+          {sorted.map((bet, index) => {
             const player = players.get(bet.playerId);
             const share = accuracy(bet.distance, bet.won);
 
             return (
               <li
                 key={bet.playerId}
-                className={`rounded-xl border p-3 ${
+                className={`reveal-row rounded-xl border p-3 ${
                   bet.won ? "border-gold bg-gold/10" : "border-line bg-paper"
                 }`}
+                style={{ animationDelay: `${Math.min(index, 8) * 60}ms` }}
               >
                 <div className="flex items-center gap-3">
                   <Avatar id={player?.avatarId ?? 0} size={32} />
