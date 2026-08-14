@@ -3,9 +3,15 @@ import { NEVER, type Bet } from "../../lib/game/bet";
 import { prisma } from "../../lib/prisma";
 import { robotAvatarId } from "../../lib/robots";
 import type { ChatMessagePayload } from "../../shared/protocol";
+import type { GameEvent } from "../../lib/game/room";
 import type { ManagedRoom, RoomManager } from "../rooms";
 import { moodOf, phraseFor } from "./mood";
-import { BOT_ROSTER, BOT_VICTORY_PHRASES } from "./roster";
+import {
+  BOT_HOST_ASLEEP_PHRASES,
+  BOT_HOST_MUTE_PHRASES,
+  BOT_ROSTER,
+  BOT_VICTORY_PHRASES,
+} from "./roster";
 
 /**
  * Режим «Forever alone»: комната набивается ботами, чтобы играть одному.
@@ -64,8 +70,39 @@ export class BotDirector {
 
   start(): void {
     if (this.timer) return;
+    this.manager.onEvents = (roomKey, events) => this.react(roomKey, events);
     this.timer = setInterval(() => this.tick(), TICK_MS);
     this.timer.unref?.();
+  }
+
+  /**
+   * Реакция на сгоревший раунд. Подкалываем только живого ведущего: боты
+   * успевают всегда, а издевательство над своим выглядело бы странно.
+   */
+  private react(roomKey: string, events: GameEvent[]): void {
+    const seats = this.parties.get(roomKey);
+    if (!seats || seats.length === 0) return;
+
+    for (const event of events) {
+      if (event.type !== "round_aborted") continue;
+      if (event.reason === "host_left") continue;
+      if (seats.some((seat) => seat.userId === event.hostId)) continue;
+
+      const seat = seats[randomInt(seats.length)];
+      if (!seat) continue;
+
+      const pool =
+        event.reason === "host_silent"
+          ? BOT_HOST_ASLEEP_PHRASES
+          : BOT_HOST_MUTE_PHRASES;
+
+      this.deps.sendChat(
+        roomKey,
+        message(seat, pool[randomInt(pool.length)] ?? "ну и ну"),
+      );
+      this.lastChatAt.set(roomKey, Date.now());
+      return;
+    }
   }
 
   stop(): void {

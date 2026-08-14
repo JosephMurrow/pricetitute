@@ -78,7 +78,13 @@ export interface RoundRecord {
 
 export type GameEvent =
   | { type: "round_started"; hostId: string; questionId: string }
-  | { type: "round_aborted"; reason: AbortReason; questionId: string }
+  | {
+      type: "round_aborted";
+      reason: AbortReason;
+      questionId: string;
+      /** Кто не успел: нужен, чтобы боты подкалывали живого, а не своих. */
+      hostId: string;
+    }
   | { type: "round_resolved"; record: RoundRecord }
   | { type: "paused"; reason: PauseReason }
   | { type: "game_finished"; winners: string[] };
@@ -419,11 +425,12 @@ export class Room {
 
   private abortRound(reason: AbortReason, now: number): GameEvent[] {
     const questionId = this.questionId;
+    const hostId = this.hostId;
     const events: GameEvent[] = [];
 
-    if (questionId !== null) {
+    if (questionId !== null && hostId !== null) {
       this.questions.burn(questionId);
-      events.push({ type: "round_aborted", reason, questionId });
+      events.push({ type: "round_aborted", reason, questionId, hostId });
     }
 
     this.clearRound();

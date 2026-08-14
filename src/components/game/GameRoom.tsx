@@ -9,6 +9,7 @@ import { BetInput } from "./BetInput";
 import { Chat } from "./Chat";
 import { Countdown } from "./Countdown";
 import { Finished } from "./Finished";
+import { LonelyNotice } from "./LonelyNotice";
 import { PlayerList } from "./PlayerList";
 import { Reveal } from "./Reveal";
 import { RoomPanel } from "./RoomPanel";
@@ -183,7 +184,16 @@ function ActionArea({
   const you = state.players.find((player) => player.id === state.youId);
 
   switch (state.phase) {
-    case "waiting":
+    case "waiting": {
+      // В общей комнате в одиночестве ждать бессмысленно: подсказываем, что
+      // делать, вместо безнадёжного «ждём второго игрока».
+      const aloneInGlobal =
+        state.roomCode === null &&
+        state.players.length === 1 &&
+        state.pauseReason !== "no_questions";
+
+      if (aloneInGlobal) return <LonelyNotice />;
+
       return (
         <div className="flex flex-col gap-3">
           <Notice>
@@ -209,6 +219,7 @@ function ActionArea({
           )}
         </div>
       );
+    }
 
     case "ready":
       if (!isHost) return <Notice>Ведущий читает вопрос про себя.</Notice>;
