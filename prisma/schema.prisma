@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// В Prisma 7 строка подключения живёт в prisma.config.ts, а не здесь.
+datasource db {
+  provider = "postgresql"
+}
+
+/// Игрок. Регистрация — только логин и пароль, email не собираем,
+/// восстановления пароля нет (см. docs/SPEC.md §2).
+model User {
+  id           String @id @default(cuid())
+  /// Хранится в нижнем регистре: логин уникален без учёта регистра.
+  login        String @unique
+  passwordHash String
+
+  /// Отображаемое имя, не равно логину.
+  nickname String
+  /// Индекс картинки из пула аватаров (0..29).
+  avatarId Int
+
+  /// Момент подтверждения возраста 18+ при регистрации.
+  adultConfirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}

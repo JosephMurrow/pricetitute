@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: pricetitute-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pricetitute
+      POSTGRES_PASSWORD: pricetitute
+      POSTGRES_DB: pricetitute
+    ports:
+      - "5432:5432"
+    volumes:
+      - pricetitute-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pricetitute -d pricetitute"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pricetitute-db-data:
