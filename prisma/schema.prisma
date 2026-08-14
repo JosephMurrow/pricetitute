@@ -31,8 +31,72 @@ model Question {
 
   createdAt DateTime @default(now())
 
+  rounds Round[]
+
   @@index([active, adult])
   @@map("questions")
+}
+
+/// Сыгранный раунд: что спросили, что ответил ведущий, кто сколько поставил.
+model Round {
+  id      String @id @default(cuid())
+  /// "global" для общей комнаты, иначе идентификатор приватной.
+  roomKey String
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  hostId String
+  host   User   @relation("HostedRounds", fields: [hostId], references: [id], onDelete: Cascade)
+
+  /// Сумма ведущего в рублях; null, если он выбрал «Ни за какие деньги».
+  hostSum   Int?
+  hostNever Boolean @default(false)
+
+  finishedAt DateTime
+
+  bets RoundBet[]
+
+  @@index([roomKey, finishedAt])
+  @@map("rounds")
+}
+
+/// Ставка игрока в раунде.
+model RoundBet {
+  id String @id @default(cuid())
+
+  roundId String
+  round   Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  playerId String
+  player   User   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  sum   Int?
+  never Boolean @default(false)
+  /// Взял ли очко за этот раунд.
+  won   Boolean @default(false)
+
+  @@unique([roundId, playerId])
+  @@map("round_bets")
+}
+
+/// Накопленный счёт игрока в конкретной комнате.
+/// Очки приватных комнат наружу не идут: они лежат под своим roomKey.
+model Score {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roomKey      String
+  points       Int    @default(0)
+  roundsPlayed Int    @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, roomKey])
+  @@index([roomKey, points])
+  @@map("scores")
 }
 
 /// Очередь вопросов конкретной комнаты: порядок сохраняется между
@@ -72,6 +136,10 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  hostedRounds Round[]    @relation("HostedRounds")
+  bets         RoundBet[]
+  scores       Score[]
 
   @@map("users")
 }
