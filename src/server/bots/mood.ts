@@ -1,4 +1,9 @@
 import { BOT_PHRASES, BOT_TAUNT_PHRASES, BOT_WHINE_PHRASES } from "./roster";
+import {
+  BLACK_BOT_PHRASES,
+  BLACK_BOT_TAUNT_PHRASES,
+  BLACK_BOT_WHINE_PHRASES,
+} from "./roster-black";
 
 /**
  * Настроение бота по текущему счёту: сильно отстал — ноет, сильно оторвался —
@@ -31,11 +36,15 @@ export function moodOf(standings: readonly Standing[], botId: string): BotMood {
 }
 
 /**
- * Набор под настроение. Именно набор, а не готовая фраза: выбор внутри него
- * делает память комнаты, которая следит, чтобы реплики не повторялись.
+ * Набор под настроение и тон комнаты. Именно набор, а не готовая фраза: выбор
+ * внутри него делает память комнаты, которая следит за повторами.
  */
-export function poolFor(mood: BotMood): readonly string[] {
-  if (mood === "taunt") return BOT_TAUNT_PHRASES;
-  if (mood === "whine") return BOT_WHINE_PHRASES;
-  return BOT_PHRASES;
+export function poolFor(mood: BotMood, black: boolean): readonly string[] {
+  if (mood === "taunt") {
+    return black ? BLACK_BOT_TAUNT_PHRASES : BOT_TAUNT_PHRASES;
+  }
+  if (mood === "whine") {
+    return black ? BLACK_BOT_WHINE_PHRASES : BOT_WHINE_PHRASES;
+  }
+  return black ? BLACK_BOT_PHRASES : BOT_PHRASES;
 }

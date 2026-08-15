@@ -2,6 +2,12 @@ import { randomInt } from "node:crypto";
 import type { EndMode } from "../game/room";
 import { dropScores } from "../game/store";
 import { prisma } from "../prisma";
+import {
+  dbValue,
+  parseMode,
+  type QuestionMode,
+  type QuestionModeDb,
+} from "../questions/modes";
 import { dropQuestionQueue } from "../questions/store";
 
 /**
@@ -23,6 +29,8 @@ export const MAX_END_VALUE = 99;
 export interface PrivateRoomSettings {
   bettingMs: number;
   includeAdult: boolean;
+  /** Каким набором паков играет комната. */
+  mode: QuestionMode;
   endMode: EndMode;
   endValue: number | null;
 }
@@ -60,6 +68,7 @@ export async function createPrivateRoom(
           hostId,
           bettingMs: settings.bettingMs,
           includeAdult: settings.includeAdult,
+          mode: dbValue(settings.mode),
           endMode: MODE_TO_DB[settings.endMode],
           endValue: settings.endValue,
         },
@@ -129,6 +138,7 @@ export function generateCode(): string {
 export function normalizeSettings(input: {
   bettingMs?: unknown;
   includeAdult?: unknown;
+  mode?: unknown;
   endMode?: unknown;
   endValue?: unknown;
 }): PrivateRoomSettings {
@@ -152,6 +162,7 @@ export function normalizeSettings(input: {
   return {
     bettingMs,
     includeAdult: input.includeAdult !== false,
+    mode: parseMode(input.mode),
     endMode,
     endValue,
   };
@@ -167,6 +178,7 @@ function toInfo(room: {
   hostId: string;
   bettingMs: number;
   includeAdult: boolean;
+  mode: QuestionModeDb;
   endMode: keyof typeof MODE_FROM_DB;
   endValue: number | null;
 }): PrivateRoomInfo {
@@ -176,6 +188,7 @@ function toInfo(room: {
     hostId: room.hostId,
     bettingMs: room.bettingMs,
     includeAdult: room.includeAdult,
+    mode: parseMode(room.mode),
     endMode: MODE_FROM_DB[room.endMode],
     endValue: room.endValue,
   };

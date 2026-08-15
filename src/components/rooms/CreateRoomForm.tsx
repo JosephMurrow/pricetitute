@@ -3,6 +3,12 @@
 import { useActionState, useState } from "react";
 import { FormError, SubmitButton } from "@/components/ui/form";
 import { EMPTY_FORM_STATE } from "@/lib/auth/form-state";
+import {
+  adultChoiceApplies,
+  MODE_COPY,
+  QUESTION_MODES,
+  type QuestionMode,
+} from "@/lib/questions/modes";
 import { createRoomAction } from "@/lib/rooms/actions";
 
 const BETTING_CHOICES = [
@@ -19,6 +25,7 @@ export function CreateRoomForm() {
   const [endMode, setEndMode] = useState<"endless" | "rounds" | "points">(
     "endless",
   );
+  const [mode, setMode] = useState<QuestionMode>("normal");
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -38,6 +45,33 @@ export function CreateRoomForm() {
               />
               <span className="block rounded-lg border border-line bg-paper px-4 py-2 text-sm transition peer-checked:border-crimson peer-checked:bg-crimson peer-checked:text-paper">
                 {choice.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="mb-2 text-sm font-medium">Какие вопросы</legend>
+        <div className="flex flex-col gap-2">
+          {QUESTION_MODES.map((option) => (
+            <label
+              key={option}
+              className="flex cursor-pointer items-start gap-2.5"
+            >
+              <input
+                type="radio"
+                name="mode"
+                value={option}
+                checked={mode === option}
+                onChange={() => setMode(option)}
+                className="mt-0.5 size-4 shrink-0 accent-crimson"
+              />
+              <span className="text-sm">
+                {MODE_COPY[option].title}
+                <span className="block text-xs text-muted">
+                  {MODE_COPY[option].hint}
+                </span>
               </span>
             </label>
           ))}
@@ -90,17 +124,23 @@ export function CreateRoomForm() {
         )}
       </fieldset>
 
-      <label className="flex items-start gap-2.5 text-sm">
-        <input
-          type="checkbox"
-          name="includeAdult"
-          defaultChecked
-          className="mt-0.5 size-4 shrink-0 accent-crimson"
-        />
-        <span className="text-muted">
-          Включить вопросы 18+. Без галочки в комнате будут только безобидные.
-        </span>
-      </label>
+      {/*
+        Галочка живёт только в обычном режиме. В остальных всё содержимое
+        взрослое по определению, и выключать там нечего.
+      */}
+      {adultChoiceApplies(mode) && (
+        <label className="flex items-start gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            name="includeAdult"
+            defaultChecked
+            className="mt-0.5 size-4 shrink-0 accent-crimson"
+          />
+          <span className="text-muted">
+            Включить вопросы 18+. Без галочки в комнате будут только безобидные.
+          </span>
+        </label>
+      )}
 
       <SubmitButton>Создать комнату</SubmitButton>
     </form>

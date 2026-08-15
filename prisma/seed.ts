@@ -27,8 +27,9 @@ async function main() {
   });
 
   const stats = await prisma.question.groupBy({
-    by: ["category"],
+    by: ["pack", "adult"],
     _count: { _all: true },
+    orderBy: [{ pack: "asc" }, { adult: "asc" }],
   });
 
   const total = await prisma.question.count();
@@ -36,7 +37,8 @@ async function main() {
   console.log(`Добавлено новых вопросов: ${count}`);
   console.log(`Всего в пуле: ${total}`);
   for (const row of stats) {
-    console.log(`  ${row.category}: ${row._count._all}`);
+    const mark = row.adult ? " 18+" : "";
+    console.log(`  ${row.pack}${mark}: ${row._count?._all ?? 0}`);
   }
 }
 

@@ -8,32 +8,47 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Тональность вопроса. Нужна для баланса пула при наполнении;
-/// в игре фильтруем по adult.
-enum QuestionCategory {
-  /// Бытовое и неловкое: мокрые носки, неделя без кофе.
-  DAILY
-  /// Социально рискованное: репутация, работа, друзья, соцсети.
-  SOCIAL
-  /// Откровенное, только для 18+.
-  ADULT
+/// Тематический пак вопроса. Пришёл на смену тональности: режим комнаты
+/// набирается из паков, а не из категорий (см. docs/BACKLOG.md F1).
+enum QuestionPack {
+  /// Нынешние 500: бытовое, социальное и откровенное.
+  STANDARD
+  /// Пьянка без жести.
+  DRUNK
+  /// Прямее и подробнее, чем откровенное из «Стандарта».
+  SEX
+  /// Чужое, подельники, нары.
+  CRIME
+  /// Самое дно, 21+. Есть ровно в одном режиме и только вручную.
+  BLACK
+}
+
+/// Набор паков, которым играет комната.
+enum QuestionMode {
+  /// Стандарт.
+  NORMAL
+  /// Стандарт, пьянка, секс, криминал.
+  DRUNK_PARTY
+  /// Пьянка, секс, криминал, чернота. Стандарта нет намеренно.
+  HARDCORE
 }
 
 /// Вопрос из пула. Задаётся ведущему, тот отвечает суммой (см. docs/SPEC.md §6).
 model Question {
-  id       String           @id @default(cuid())
-  text     String           @unique
-  category QuestionCategory
-  /// В приватной комнате хост может выключить такие вопросы.
-  adult    Boolean          @default(false)
+  id     String       @id @default(cuid())
+  text   String       @unique
+  pack   QuestionPack @default(STANDARD)
+  /// Взрослое содержимое. В «Обычном» режиме хост может это выключить;
+  /// в остальных паках взрослое всё, и галочка там не показывается.
+  adult  Boolean      @default(false)
   /// Выключенный вопрос не попадает в новые очереди.
-  active   Boolean          @default(true)
+  active Boolean      @default(true)
 
   createdAt DateTime @default(now())
 
   rounds Round[]
 
-  @@index([active, adult])
+  @@index([active, pack, adult])
   @@map("questions")
 }
 
@@ -102,16 +117,18 @@ model Score {
 /// Очередь вопросов конкретной комнаты: порядок сохраняется между
 /// перезапусками сервера. Голова очереди — нулевой элемент массива.
 model RoomQuestionQueue {
-  id String @id @default(cuid())
+  id           String       @id @default(cuid())
   /// "global" для общей комнаты, иначе идентификатор приватной.
-  roomKey String @unique
+  roomKey      String       @unique
   /// Идентификаторы вопросов в порядке выдачи.
-  queue String[]
+  queue        String[]
   /// Уже выданные в текущем круге: без этого после перезапуска сервера
   /// показанные вопросы вернулись бы в очередь как новые.
-  consumed String[]
+  consumed     String[]
   /// Учитываются ли в этой очереди вопросы 18+.
-  includeAdult Boolean @default(true)
+  includeAdult Boolean      @default(true)
+  /// Каким режимом собрана очередь: смена режима собирает её заново.
+  mode         QuestionMode @default(NORMAL)
 
   updatedAt DateTime @updatedAt
 
@@ -130,7 +147,7 @@ enum RoomEndMode {
 
 /// Приватная комната: счёт внутри неё наружу не уходит (см. docs/SPEC.md §3.2).
 model PrivateRoom {
-  id String @id @default(cuid())
+  id   String @id @default(cuid())
   /// Короткий код из ссылки-приглашения.
   code String @unique
 
@@ -138,13 +155,14 @@ model PrivateRoom {
   host   User   @relation("HostedRooms", fields: [hostId], references: [id], onDelete: Cascade)
 
   /// Длительность фазы ставок, мс.
-  bettingMs    Int         @default(300000)
-  includeAdult Boolean     @default(true)
-  endMode      RoomEndMode @default(ENDLESS)
+  bettingMs    Int          @default(300000)
+  includeAdult Boolean      @default(true)
+  mode         QuestionMode @default(NORMAL)
+  endMode      RoomEndMode  @default(ENDLESS)
   /// Сколько раундов или очков до конца партии.
-  endValue Int?
+  endValue     Int?
 
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
   /// Когда комната опустела. Через полчаса после этого её удаляют.
   emptySince DateTime?
 

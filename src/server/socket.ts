@@ -122,7 +122,7 @@ async function resolveRoom(
     key: room.id,
     code: room.code,
     setup: {
-      pool: { includeAdult: room.includeAdult },
+      pool: { includeAdult: room.includeAdult, mode: room.mode },
       rules: {
         timings: { bettingMs: room.bettingMs },
         endMode: room.endMode,

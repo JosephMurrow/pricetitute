@@ -1,12 +1,20 @@
 import { prisma } from "../prisma";
+import {
+  adultChoiceApplies,
+  dbValue,
+  PACKS_BY_MODE,
+  type QuestionMode,
+} from "./modes";
 import { QuestionQueue } from "./queue";
 
 /** Ключ очереди общей комнаты. У приватных ключ — идентификатор комнаты. */
 export const GLOBAL_ROOM_KEY = "global";
 
 export interface QuestionPoolOptions {
-  /** Брать ли вопросы с флагом 18+. В общей комнате всегда true. */
+  /** Брать ли вопросы с флагом 18+. Имеет смысл только в обычном режиме. */
   includeAdult: boolean;
+  /** Какими паками играет комната. Общая комната — всегда обычным. */
+  mode: QuestionMode;
 }
 
 export interface QuestionCard {
@@ -16,15 +24,22 @@ export interface QuestionCard {
 }
 
 /**
- * Очередь комнаты: поднимаем сохранённый порядок, если он есть и собран с той
- * же настройкой 18+. Иначе собираем свежую перемешанную.
+ * Очередь комнаты: поднимаем сохранённый порядок, если он есть и собран с теми
+ * же режимом и настройкой 18+. Иначе собираем свежую перемешанную — состав
+ * пула изменился, и старый порядок больше ничего не значит.
  */
 export async function loadQuestionQueue(
   roomKey: string,
-  { includeAdult }: QuestionPoolOptions,
+  { includeAdult, mode }: QuestionPoolOptions,
 ): Promise<QuestionQueue> {
   const questions = await prisma.question.findMany({
-    where: { active: true, ...(includeAdult ? {} : { adult: false }) },
+    where: {
+      active: true,
+      pack: { in: [...PACKS_BY_MODE[mode]] },
+      // Вне обычного режима паки взрослые целиком: отсечь по adult значит
+      // остаться вообще без вопросов.
+      ...(adultChoiceApplies(mode) && !includeAdult ? { adult: false } : {}),
+    },
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });
@@ -34,7 +49,11 @@ export async function loadQuestionQueue(
     where: { roomKey },
   });
 
-  if (saved && saved.includeAdult === includeAdult) {
+  if (
+    saved &&
+    saved.includeAdult === includeAdult &&
+    saved.mode === dbValue(mode)
+  ) {
     return QuestionQueue.restore(ids, {
       queue: saved.queue,
       consumed: saved.consumed,
@@ -47,14 +66,15 @@ export async function loadQuestionQueue(
 export async function saveQuestionQueue(
   roomKey: string,
   queue: QuestionQueue,
-  { includeAdult }: QuestionPoolOptions,
+  { includeAdult, mode }: QuestionPoolOptions,
 ): Promise<void> {
   const { queue: items, consumed } = queue.snapshot();
+  const stored = { queue: items, consumed, includeAdult, mode: dbValue(mode) };
 
   await prisma.roomQuestionQueue.upsert({
     where: { roomKey },
-    create: { roomKey, queue: items, consumed, includeAdult },
-    update: { queue: items, consumed, includeAdult },
+    create: { roomKey, ...stored },
+    update: stored,
   });
 }
 

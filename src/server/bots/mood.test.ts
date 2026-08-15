@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { LEAD_GAP, moodOf, poolFor } from "./mood";
 import { BOT_PHRASES, BOT_TAUNT_PHRASES, BOT_WHINE_PHRASES } from "./roster";
+import {
+  BLACK_BOT_PHRASES,
+  BLACK_BOT_TAUNT_PHRASES,
+  BLACK_BOT_WHINE_PHRASES,
+} from "./roster-black";
 
 const BOT = "бот";
 
@@ -45,9 +50,35 @@ describe("Настроение бота", () => {
 
 describe("Выбор набора по настроению", () => {
   it("отдаёт набор под настроение", () => {
-    assert.equal(poolFor("taunt"), BOT_TAUNT_PHRASES);
-    assert.equal(poolFor("whine"), BOT_WHINE_PHRASES);
-    assert.equal(poolFor("idle"), BOT_PHRASES);
+    assert.equal(poolFor("taunt", false), BOT_TAUNT_PHRASES);
+    assert.equal(poolFor("whine", false), BOT_WHINE_PHRASES);
+    assert.equal(poolFor("idle", false), BOT_PHRASES);
+  });
+
+  it("в чёрном ключе берёт другие наборы целиком", () => {
+    assert.equal(poolFor("taunt", true), BLACK_BOT_TAUNT_PHRASES);
+    assert.equal(poolFor("whine", true), BLACK_BOT_WHINE_PHRASES);
+    assert.equal(poolFor("idle", true), BLACK_BOT_PHRASES);
+  });
+
+  it("наборы чёрного ключа не пересекаются с приличными", () => {
+    const polite = new Set([
+      ...BOT_TAUNT_PHRASES,
+      ...BOT_WHINE_PHRASES,
+      ...BOT_PHRASES,
+    ]);
+    const black = [
+      ...BLACK_BOT_TAUNT_PHRASES,
+      ...BLACK_BOT_WHINE_PHRASES,
+      ...BLACK_BOT_PHRASES,
+    ];
+
+    assert.equal(
+      black.filter((phrase) => polite.has(phrase)).length,
+      0,
+      "фраза попала и в приличный набор, и в чёрный",
+    );
+    assert.equal(new Set(black).size, black.length, "повтор внутри чёрных");
   });
 
   it("наборы не пересекаются между собой", () => {

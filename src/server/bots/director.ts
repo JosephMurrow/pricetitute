@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { NEVER, type Bet } from "../../lib/game/bet";
+import { isHardcore } from "../../lib/questions/modes";
 import { prisma } from "../../lib/prisma";
 import { robotAvatarId } from "../../lib/robots";
 import type { ChatMessagePayload } from "../../shared/protocol";
@@ -13,6 +14,12 @@ import {
   BOT_ROSTER,
   BOT_VICTORY_PHRASES,
 } from "./roster";
+import {
+  BLACK_BOT_FAREWELLS,
+  BLACK_BOT_HOST_ASLEEP_PHRASES,
+  BLACK_BOT_HOST_MUTE_PHRASES,
+  BLACK_BOT_VICTORY_PHRASES,
+} from "./roster-black";
 
 /**
  * Режим «Forever alone»: комната набивается ботами, чтобы играть одному.
@@ -94,8 +101,13 @@ export class BotDirector {
       const seat = seats[randomInt(seats.length)];
       if (!seat) continue;
 
-      const pool =
-        event.reason === "host_silent"
+      const black = this.isBlack(roomKey);
+      const asleep = event.reason === "host_silent";
+      const pool = black
+        ? asleep
+          ? BLACK_BOT_HOST_ASLEEP_PHRASES
+          : BLACK_BOT_HOST_MUTE_PHRASES
+        : asleep
           ? BOT_HOST_ASLEEP_PHRASES
           : BOT_HOST_MUTE_PHRASES;
 
@@ -171,16 +183,30 @@ export class BotDirector {
     const managed = this.manager.get(roomKey);
     if (!seats || !managed) return;
 
+    const black = this.isBlack(roomKey);
     this.parties.delete(roomKey);
-    this.lastChatAt.delete(roomKey);
-    this.celebrated.delete(roomKey);
-    this.said.delete(roomKey);
 
+    // Прощаемся до того, как забыть комнату: в чёрном ключе прощание тоже
+    // идёт из общего набора и не должно повторяться.
     for (const seat of seats) {
-      this.deps.sendChat(roomKey, message(seat, seat.farewell));
+      const text = black
+        ? this.say(roomKey, BLACK_BOT_FAREWELLS)
+        : seat.farewell;
+
+      this.deps.sendChat(roomKey, message(seat, text));
       managed.profiles.delete(seat.userId);
       managed.runner.run((room, at) => room.leave(seat.userId, at));
     }
+
+    this.lastChatAt.delete(roomKey);
+    this.celebrated.delete(roomKey);
+    this.said.delete(roomKey);
+  }
+
+  /** Играет ли комната чернотой: от этого зависит весь тон реплик. */
+  private isBlack(roomKey: string): boolean {
+    const managed = this.manager.get(roomKey);
+    return managed ? isHardcore(managed.setup.pool.mode) : false;
   }
 
   /** Убрать ботов молча: комната закрывается. */
@@ -273,7 +299,15 @@ export class BotDirector {
 
     this.deps.sendChat(
       managed.key,
-      message(seat, this.say(managed.key, BOT_VICTORY_PHRASES)),
+      message(
+        seat,
+        this.say(
+          managed.key,
+          this.isBlack(managed.key)
+            ? BLACK_BOT_VICTORY_PHRASES
+            : BOT_VICTORY_PHRASES,
+        ),
+      ),
     );
     this.lastChatAt.set(managed.key, now);
   }
@@ -310,7 +344,7 @@ export class BotDirector {
 
     this.deps.sendChat(
       roomKey,
-      message(seat, this.say(roomKey, poolFor(mood))),
+      message(seat, this.say(roomKey, poolFor(mood, this.isBlack(roomKey)))),
     );
 
     this.lastChatAt.set(roomKey, now);
