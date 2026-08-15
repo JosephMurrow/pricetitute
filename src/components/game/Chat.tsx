@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { enoughVisible, unreadLabel } from "@/lib/unread";
 import { CHAT_MAX_LENGTH, type ChatMessagePayload } from "@/shared/protocol";
 import { Crown } from "./Crown";
 
 /** Запас в пикселях, в пределах которого лента считается прокрученной вниз. */
 const BOTTOM_SLACK = 24;
+
+/** Шаг отслеживания видимости: нужен частый, счёт идёт в пикселях. */
+const THRESHOLDS = Array.from({ length: 21 }, (_, step) => step / 20);
 
 export function Chat({
   messages,
@@ -23,17 +27,47 @@ export function Chat({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
+  const [onScreen, setOnScreen] = useState(true);
   const [seenCount, setSeenCount] = useState(messages.length);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Пока человек внизу ленты, прочитанным считается всё. Подстройка состояния
-  // прямо в рендере — штатный приём React, эффект здесь был бы лишним.
-  if (atBottom && seenCount !== messages.length) {
+  // Прочитанным считается только то, что человек действительно мог увидеть:
+  // лента внизу и сама лента перед глазами. Одной прокрутки мало — на телефоне
+  // чат уезжает под игровое поле, и там лента стоит внизу, никем не читаемая.
+  const canSee = atBottom && onScreen;
+
+  // Подстройка состояния прямо в рендере — штатный приём React, эффект здесь
+  // был бы лишним.
+  if (canSee && seenCount !== messages.length) {
     setSeenCount(messages.length);
   }
 
   const unreadCount = Math.max(0, messages.length - seenCount);
   const unread = unreadCount > 0 ? messages.at(-1) : undefined;
+
+  // Видно ли ленту. Считаем по самой ленте, а не по ширине экрана: на планшете
+  // разметка десктопная, но чат всё равно может оказаться за нижним краем.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+
+        setOnScreen(
+          enoughVisible(
+            entry.boundingClientRect.height,
+            entry.intersectionRect.height,
+          ),
+        );
+      },
+      { threshold: THRESHOLDS },
+    );
+    observer.observe(list);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Прокручиваем только саму ленту и только когда человек и так внизу.
   // Прежний scrollIntoView тащил за собой всю страницу, и на телефоне это
@@ -50,6 +84,12 @@ export function Chat({
 
     list.scrollTop = list.scrollHeight;
     setAtBottom(true);
+  }
+
+  /** Подтащить к чату и страницу, и саму ленту: иначе доедешь до половины. */
+  function focusChat() {
+    listRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollToBottom();
   }
 
   async function submit() {
@@ -111,18 +151,33 @@ export function Chat({
           ))}
         </div>
 
-        {unread && (
+        {unread && onScreen && (
           <button
             type="button"
             onClick={scrollToBottom}
             className="absolute inset-x-3 bottom-2 truncate rounded-full bg-crimson px-3 py-1.5 text-xs font-medium text-paper shadow-lg transition hover:bg-deep"
           >
-            {unreadCount > 1
-              ? `Новых сообщений: ${unreadCount}, последнее от «${unread.nickname}»`
-              : `Новое сообщение от «${unread.nickname}»`}
+            {unreadLabel(unreadCount, unread.nickname)}
           </button>
         )}
       </div>
+
+      {/*
+        Чат уехал за экран — облачко переезжает к верхнему краю окна. Именно
+        к верхнему: внизу поле ставки и кнопка «Поставить», и перекрывать их
+        ради подсказки о чате нельзя.
+      */}
+      {unread && !onScreen && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 pt-3">
+          <button
+            type="button"
+            onClick={focusChat}
+            className="pointer-events-auto max-w-full truncate rounded-full bg-crimson px-4 py-2 text-xs font-medium text-paper shadow-lg transition hover:bg-deep"
+          >
+            ↓ {unreadLabel(unreadCount, unread.nickname)}
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-2 border-t border-line p-3">
         <input

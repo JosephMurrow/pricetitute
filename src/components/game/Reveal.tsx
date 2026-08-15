@@ -1,7 +1,11 @@
 import { Avatar } from "@/components/Avatar";
 import { formatBet, isNever } from "@/lib/game/bet";
 import { MAX_MISS_FACTOR } from "@/lib/game/scoring";
-import type { RoomStatePayload } from "@/shared/protocol";
+import type {
+  PlayerPayload,
+  RevealBetPayload,
+  RoomStatePayload,
+} from "@/shared/protocol";
 
 /**
  * Вскрышка: ответ ведущего и все ставки разом. Длина полоски — насколько
@@ -32,18 +36,9 @@ export function Reveal({ state }: { state: RoomStatePayload }) {
         </p>
       </div>
 
-      {sorted.length > 0 && !sorted.some((bet) => bet.won) && (
-        <p className="rounded-xl border border-line bg-paper px-4 py-3 text-center text-sm text-muted">
-          Никто не угадал достаточно близко. Очко достаётся, если промахнуться
-          не больше чем в {MAX_MISS_FACTOR} раза.
-        </p>
-      )}
+      <Outcome bets={sorted} players={players} />
 
-      {sorted.length === 0 ? (
-        <p className="text-center text-sm text-muted">
-          В этом раунде никто не успел поставить
-        </p>
-      ) : (
+      {sorted.length > 0 && (
         <ul className="flex flex-col gap-2">
           {sorted.map((bet, index) => {
             const player = players.get(bet.playerId);
@@ -97,6 +92,76 @@ export function Reveal({ state }: { state: RoomStatePayload }) {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * Итог раунда одной рамкой: кто взял очко. Все три исхода — победитель,
+ * ничья, пустой раунд — живут в ней же. Два разных способа сказать про один и
+ * тот же итог на одном экране только сбивают с толку.
+ */
+function Outcome({
+  bets,
+  players,
+}: {
+  bets: readonly RevealBetPayload[];
+  players: ReadonlyMap<string, PlayerPayload>;
+}) {
+  if (bets.length === 0) {
+    return (
+      <div className="reveal-row rounded-2xl border border-dashed border-line bg-paper p-4 text-center text-sm text-muted">
+        Никто не успел поставить
+      </div>
+    );
+  }
+
+  const winners = bets.filter((bet) => bet.won);
+
+  if (winners.length === 0) {
+    return (
+      <div className="reveal-row rounded-2xl border border-dashed border-line bg-paper p-4 text-center">
+        <p className="text-sm font-semibold">Раунд без победителя</p>
+        <p className="mt-1 text-xs text-muted">
+          Никто не угадал достаточно близко. Очко достаётся, если промахнуться
+          не больше чем в {MAX_MISS_FACTOR} раза.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="reveal-row rounded-2xl border-2 border-gold bg-gold/10 p-4">
+      <p className="text-center text-xs font-semibold text-muted">
+        {winners.length > 1 ? "Победители раунда" : "Победитель раунда"}
+      </p>
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {winners.map((bet) => {
+          const player = players.get(bet.playerId);
+
+          return (
+            <li key={bet.playerId} className="flex items-center gap-3">
+              <Avatar id={player?.avatarId ?? 0} size={40} />
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">
+                  {player?.nickname ?? "Игрок"}
+                </p>
+                <p className="text-xs text-muted">{miss(bet.distance, true)}</p>
+              </div>
+
+              <span
+                className={`shrink-0 font-bold text-crimson ${
+                  isNever(bet.bet) ? "" : "tabular"
+                }`}
+              >
+                {formatBet(bet.bet)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
