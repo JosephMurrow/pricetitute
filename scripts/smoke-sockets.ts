@@ -169,7 +169,8 @@ async function main() {
   const hostBet = await a.emit(CLIENT_EVENT.bet, { bet: 50_000 });
   check("ведущий ставить не может", !hostBet.ok, hostBet.error);
 
-  const bet = await b.emit(CLIENT_EVENT.bet, { bet: 300_000 });
+  // Полуторный промах: очко даётся, если ошибиться не больше чем вдвое.
+  const bet = await b.emit(CLIENT_EVENT.bet, { bet: 150_000 });
   check("игрок поставил", bet.ok);
 
   const repeat = await b.emit(CLIENT_EVENT.bet, { bet: 1000 });

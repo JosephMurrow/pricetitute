@@ -16,6 +16,9 @@
   --color-deep: #8e0a34;
   --color-rose: #ff5c93;
   --color-gold: #dd9a24;
+  /* Короны титулов: золото — за всё время, серебро — за неделю, бронза — комната. */
+  --color-silver: #8e97ad;
+  --color-bronze: #b57a4d;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

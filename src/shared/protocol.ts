@@ -92,6 +92,12 @@ export interface RoomStatePayload {
   endValue: number | null;
   /** Хозяин приватной комнаты; в общей — null. */
   ownerId: string | null;
+  /**
+   * Чемпионы рейтинга общей комнаты. Приходят и в приватную: титул человек
+   * заслужил вообще, а не в этой комнате, и носит его везде.
+   */
+  allTimeChampionId: string | null;
+  weekChampionId: string | null;
   /** Код приватной комнаты для ссылки-приглашения; в общей — null. */
   roomCode: string | null;
   /**

@@ -5,6 +5,9 @@ import { Avatar } from "@/components/Avatar";
 import { BRAND, Brand } from "@/components/Brand";
 import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUser } from "@/lib/auth/session";
+import { loadChampions } from "@/lib/champions";
+import { crownFor, type Titles } from "@/lib/game/crowns";
+import { Crown } from "@/components/game/Crown";
 import {
   loadLeaderboard,
   TOP_SIZE,
@@ -28,7 +31,18 @@ export default async function LeaderboardPage({
 
   const search = await searchParams;
   const period: LeaderboardPeriod = search.period === "week" ? "week" : "all";
-  const board = await loadLeaderboard(period, user.id);
+  const [board, champs] = await Promise.all([
+    loadLeaderboard(period, user.id),
+    loadChampions(),
+  ]);
+
+  // В таблице рейтинга комнаты нет, поэтому и бронзовой короне тут взяться
+  // неоткуда: только чемпион недели и чемпион за всё время.
+  const titles: Titles = {
+    allTimeChampionId: champs.allTime,
+    weekChampionId: champs.week,
+    leaders: new Set(),
+  };
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -71,13 +85,18 @@ export default async function LeaderboardPage({
 
           <ul>
             {board.rows.map((row) => (
-              <Row key={row.userId} row={row} you={row.userId === user.id} />
+              <Row
+                key={row.userId}
+                row={row}
+                you={row.userId === user.id}
+                titles={titles}
+              />
             ))}
           </ul>
 
           {board.you && (
             <div className="border-t-2 border-dashed border-line">
-              <Row row={board.you} you />
+              <Row row={board.you} you titles={titles} />
             </div>
           )}
         </div>
@@ -92,7 +111,17 @@ export default async function LeaderboardPage({
   );
 }
 
-function Row({ row, you }: { row: LeaderboardRow; you: boolean }) {
+function Row({
+  row,
+  you,
+  titles,
+}: {
+  row: LeaderboardRow;
+  you: boolean;
+  titles: Titles;
+}) {
+  const crown = crownFor(row.userId, titles);
+
   return (
     <li
       className={`flex items-center gap-2 border-b border-line px-3 py-2.5 last:border-b-0 sm:gap-3 sm:px-4 ${
@@ -110,6 +139,7 @@ function Row({ row, you }: { row: LeaderboardRow; you: boolean }) {
       <Avatar id={row.avatarId} size={32} className="shrink-0" />
 
       <span className="min-w-0 flex-1 truncate text-sm font-medium">
+        {crown && <Crown kind={crown} className="mr-1" />}
         {row.nickname}
         {you && <span className="ml-1 text-xs text-muted">· ты</span>}
       </span>

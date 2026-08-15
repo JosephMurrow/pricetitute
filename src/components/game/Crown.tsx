@@ -1,17 +1,21 @@
+import { CROWN_TITLES, type CrownKind } from "@/lib/game/crowns";
+
 /**
  * Корона рядом с ником. Мелкая: она метка, а не украшение, и не должна
- * перебивать сам ник.
+ * перебивать сам ник. Титул различается цветом — золото, серебро, бронза —
+ * и подписывается при наведении.
  */
 export function Crown({
-  title,
+  kind,
   size = 13,
   className = "",
 }: {
-  /** Подпись для наведения и для читалки с экрана. */
-  title: string;
+  kind: CrownKind;
   size?: number;
   className?: string;
 }) {
+  const title = CROWN_TITLES[kind];
+
   return (
     <svg
       viewBox="0 0 24 20"
@@ -24,7 +28,7 @@ export function Crown({
       <title>{title}</title>
       <path
         d="M1.6 5.2 6.8 9.4 12 1.8l5.2 7.6 5.2-4.2-1.9 11H3.5z"
-        fill="var(--color-gold)"
+        fill={METAL[kind]}
         stroke="var(--color-deep)"
         strokeWidth="1.4"
         strokeLinejoin="round"
@@ -32,3 +36,9 @@ export function Crown({
     </svg>
   );
 }
+
+const METAL: Record<CrownKind, string> = {
+  alltime: "var(--color-gold)",
+  week: "var(--color-silver)",
+  room: "var(--color-bronze)",
+};

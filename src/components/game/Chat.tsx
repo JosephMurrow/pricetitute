@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { crownFor, type Titles } from "@/lib/game/crowns";
 import { enoughVisible, unreadLabel } from "@/lib/unread";
 import { CHAT_MAX_LENGTH, type ChatMessagePayload } from "@/shared/protocol";
 import { Crown } from "./Crown";
@@ -15,13 +16,13 @@ const THRESHOLDS = Array.from({ length: 21 }, (_, step) => step / 20);
 export function Chat({
   messages,
   youId,
-  leaders,
+  titles,
   onSend,
 }: {
   messages: ChatMessagePayload[];
   youId: string;
-  /** Кто сейчас ведёт по очкам: рядом с их ником рисуется корона. */
-  leaders: ReadonlySet<string>;
+  /** Кто какую корону носит: рисуется рядом с ником. */
+  titles: Titles;
   onSend: (text: string) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
@@ -131,24 +132,26 @@ export function Chat({
             </p>
           )}
 
-          {messages.map((message) => (
-            <div key={message.id} className="flex items-start gap-2">
-              <Avatar id={message.avatarId} size={24} className="mt-0.5" />
-              <p className="min-w-0 flex-1 break-words text-sm">
-                {leaders.has(message.playerId) && (
-                  <Crown title="Лидер комнаты" className="mr-1" />
-                )}
-                <span
-                  className={`mr-1 font-medium ${
-                    message.playerId === youId ? "text-crimson" : "text-muted"
-                  }`}
-                >
-                  {message.nickname}
-                </span>
-                {message.text}
-              </p>
-            </div>
-          ))}
+          {messages.map((message) => {
+            const crown = crownFor(message.playerId, titles);
+
+            return (
+              <div key={message.id} className="flex items-start gap-2">
+                <Avatar id={message.avatarId} size={24} className="mt-0.5" />
+                <p className="min-w-0 flex-1 break-words text-sm">
+                  {crown && <Crown kind={crown} className="mr-1" />}
+                  <span
+                    className={`mr-1 font-medium ${
+                      message.playerId === youId ? "text-crimson" : "text-muted"
+                    }`}
+                  >
+                    {message.nickname}
+                  </span>
+                  {message.text}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
         {unread && onScreen && (

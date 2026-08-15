@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
 import { Server as IOServer, type Socket } from "socket.io";
+import { champions, refreshChampions } from "../lib/champions";
 import { parseBet } from "../lib/game/bet";
 import { findPrivateRoom } from "../lib/rooms/private";
 import {
@@ -62,6 +63,10 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     },
   });
   director.start();
+
+  // Греем кеш чемпионов заранее: иначе первый вошедший увидит комнату без
+  // корон и дождётся их только со следующей рассылкой.
+  refreshChampions();
 
   io.use((socket, next) => {
     void authenticateSocket(socket.handshake.headers)
@@ -294,6 +299,11 @@ export function buildState(
   const questionVisible = view.questionVisibleToAll || view.hostId === viewerId;
   const winners = new Set(view.reveal?.winners ?? []);
 
+  // Чемпионы берутся из кеша, а обновление уходит в фон: держать рассылку
+  // состояния ради похода в базу нельзя.
+  refreshChampions();
+  const champs = champions();
+
   return {
     roomKey: managed.key,
     phase: view.phase,
@@ -332,6 +342,8 @@ export function buildState(
     endMode: view.endMode,
     endValue: view.endValue,
     ownerId: view.ownerId,
+    allTimeChampionId: champs.allTime,
+    weekChampionId: champs.week,
     roomCode,
     // Кнопка «Forever alone» — только хозяину пустой приватной комнаты.
     canInviteBots:
