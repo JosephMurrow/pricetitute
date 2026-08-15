@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Brand } from "@/components/Brand";
 import { UserMenu } from "@/components/UserMenu";
 import type { Bet } from "@/lib/game/bet";
+import { roomLeaders } from "@/lib/game/crowns";
 import type { RoomStatePayload } from "@/shared/protocol";
 import { BetInput } from "./BetInput";
 import { Chat } from "./Chat";
@@ -98,6 +99,7 @@ export function GameRoom({
             <Chat
               messages={room.chat}
               youId={state.youId}
+              leaders={roomLeaders(state.players)}
               onSend={room.sendChat}
             />
           </aside>

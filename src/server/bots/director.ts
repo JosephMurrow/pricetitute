@@ -5,7 +5,8 @@ import { robotAvatarId } from "../../lib/robots";
 import type { ChatMessagePayload } from "../../shared/protocol";
 import type { GameEvent } from "../../lib/game/room";
 import type { ManagedRoom, RoomManager } from "../rooms";
-import { moodOf, phraseFor } from "./mood";
+import { moodOf, poolFor } from "./mood";
+import { PhraseMemory } from "./phrases";
 import {
   BOT_HOST_ASLEEP_PHRASES,
   BOT_HOST_MUTE_PHRASES,
@@ -61,6 +62,8 @@ export class BotDirector {
   private readonly lastChatAt = new Map<string, number>();
   /** Вопрос последней вскрышки, которую уже отпраздновали. */
   private readonly celebrated = new Map<string, string>();
+  /** Что в комнате уже звучало: одна фраза не повторяется пять минут. */
+  private readonly said = new Map<string, PhraseMemory>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -96,10 +99,7 @@ export class BotDirector {
           ? BOT_HOST_ASLEEP_PHRASES
           : BOT_HOST_MUTE_PHRASES;
 
-      this.deps.sendChat(
-        roomKey,
-        message(seat, pool[randomInt(pool.length)] ?? "ну и ну"),
-      );
+      this.deps.sendChat(roomKey, message(seat, this.say(roomKey, pool)));
       this.lastChatAt.set(roomKey, Date.now());
       return;
     }
@@ -174,6 +174,7 @@ export class BotDirector {
     this.parties.delete(roomKey);
     this.lastChatAt.delete(roomKey);
     this.celebrated.delete(roomKey);
+    this.said.delete(roomKey);
 
     for (const seat of seats) {
       this.deps.sendChat(roomKey, message(seat, seat.farewell));
@@ -187,6 +188,7 @@ export class BotDirector {
     this.parties.delete(roomKey);
     this.lastChatAt.delete(roomKey);
     this.celebrated.delete(roomKey);
+    this.said.delete(roomKey);
   }
 
   private tick(): void {
@@ -271,9 +273,23 @@ export class BotDirector {
 
     this.deps.sendChat(
       managed.key,
-      message(seat, pick(BOT_VICTORY_PHRASES, "изи")),
+      message(seat, this.say(managed.key, BOT_VICTORY_PHRASES)),
     );
     this.lastChatAt.set(managed.key, now);
+  }
+
+  /**
+   * Реплика из набора с оглядкой на то, что в комнате уже звучало. Память
+   * общая на все наборы: победная фраза и подколка ведущему считаются одинаково.
+   */
+  private say(roomKey: string, pool: readonly string[]): string {
+    let memory = this.said.get(roomKey);
+    if (!memory) {
+      memory = new PhraseMemory();
+      this.said.set(roomKey, memory);
+    }
+
+    return memory.pick(pool) ?? "…";
   }
 
   private chatter(managed: ManagedRoom, seats: Seat[], now: number): void {
@@ -287,24 +303,19 @@ export class BotDirector {
     const seat = ready[randomInt(ready.length)];
     if (!seat) return;
 
-    this.deps.sendChat(roomKey, message(seat, moodPhrase(managed, seat)));
+    const standings = managed.room
+      .view()
+      .players.map((player) => ({ id: player.id, score: player.score }));
+    const mood = moodOf(standings, seat.userId);
+
+    this.deps.sendChat(
+      roomKey,
+      message(seat, this.say(roomKey, poolFor(mood))),
+    );
 
     this.lastChatAt.set(roomKey, now);
     seat.nextChatAt = now + randomBetween(CHAT_MIN_MS, CHAT_MAX_MS);
   }
-}
-
-/** Что бот скажет с учётом положения дел в комнате. */
-function moodPhrase(managed: ManagedRoom, seat: Seat): string {
-  const standings = managed.room
-    .view()
-    .players.map((player) => ({ id: player.id, score: player.score }));
-
-  return phraseFor(moodOf(standings, seat.userId));
-}
-
-function pick(source: readonly string[], fallback: string): string {
-  return source[randomInt(source.length)] ?? fallback;
 }
 
 interface Plan {

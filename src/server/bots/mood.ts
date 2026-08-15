@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import { BOT_PHRASES, BOT_TAUNT_PHRASES, BOT_WHINE_PHRASES } from "./roster";
 
 /**
@@ -31,13 +30,12 @@ export function moodOf(standings: readonly Standing[], botId: string): BotMood {
   return "idle";
 }
 
-export function phraseFor(mood: BotMood): string {
-  const pool =
-    mood === "taunt"
-      ? BOT_TAUNT_PHRASES
-      : mood === "whine"
-        ? BOT_WHINE_PHRASES
-        : BOT_PHRASES;
-
-  return pool[randomInt(pool.length)] ?? "…";
+/**
+ * Набор под настроение. Именно набор, а не готовая фраза: выбор внутри него
+ * делает память комнаты, которая следит, чтобы реплики не повторялись.
+ */
+export function poolFor(mood: BotMood): readonly string[] {
+  if (mood === "taunt") return BOT_TAUNT_PHRASES;
+  if (mood === "whine") return BOT_WHINE_PHRASES;
+  return BOT_PHRASES;
 }

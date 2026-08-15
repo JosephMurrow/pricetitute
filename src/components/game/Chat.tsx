@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { CHAT_MAX_LENGTH, type ChatMessagePayload } from "@/shared/protocol";
+import { Crown } from "./Crown";
 
 /** Запас в пикселях, в пределах которого лента считается прокрученной вниз. */
 const BOTTOM_SLACK = 24;
@@ -10,10 +11,13 @@ const BOTTOM_SLACK = 24;
 export function Chat({
   messages,
   youId,
+  leaders,
   onSend,
 }: {
   messages: ChatMessagePayload[];
   youId: string;
+  /** Кто сейчас ведёт по очкам: рядом с их ником рисуется корона. */
+  leaders: ReadonlySet<string>;
   onSend: (text: string) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
@@ -91,6 +95,9 @@ export function Chat({
             <div key={message.id} className="flex items-start gap-2">
               <Avatar id={message.avatarId} size={24} className="mt-0.5" />
               <p className="min-w-0 flex-1 break-words text-sm">
+                {leaders.has(message.playerId) && (
+                  <Crown title="Лидер комнаты" className="mr-1" />
+                )}
                 <span
                   className={`mr-1 font-medium ${
                     message.playerId === youId ? "text-crimson" : "text-muted"

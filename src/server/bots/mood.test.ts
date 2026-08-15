@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LEAD_GAP, moodOf, phraseFor } from "./mood";
+import { LEAD_GAP, moodOf, poolFor } from "./mood";
 import { BOT_PHRASES, BOT_TAUNT_PHRASES, BOT_WHINE_PHRASES } from "./roster";
 
 const BOT = "бот";
@@ -43,11 +43,11 @@ describe("Настроение бота", () => {
   });
 });
 
-describe("Выбор реплики по настроению", () => {
-  it("берёт фразу из своего набора", () => {
-    assert.ok(BOT_TAUNT_PHRASES.includes(phraseFor("taunt")));
-    assert.ok(BOT_WHINE_PHRASES.includes(phraseFor("whine")));
-    assert.ok(BOT_PHRASES.includes(phraseFor("idle")));
+describe("Выбор набора по настроению", () => {
+  it("отдаёт набор под настроение", () => {
+    assert.equal(poolFor("taunt"), BOT_TAUNT_PHRASES);
+    assert.equal(poolFor("whine"), BOT_WHINE_PHRASES);
+    assert.equal(poolFor("idle"), BOT_PHRASES);
   });
 
   it("наборы не пересекаются между собой", () => {

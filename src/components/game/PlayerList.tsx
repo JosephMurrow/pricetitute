@@ -1,7 +1,9 @@
 "use client";
 
 import { Avatar } from "@/components/Avatar";
+import { roomLeaders } from "@/lib/game/crowns";
 import type { PlayerPayload, RoomStatePayload } from "@/shared/protocol";
+import { Crown } from "./Crown";
 
 export function PlayerList({
   state,
@@ -12,6 +14,7 @@ export function PlayerList({
   onKick?: (playerId: string) => void;
 }) {
   const ranked = [...state.players].sort((a, b) => b.score - a.score);
+  const leaders = roomLeaders(state.players);
   const youAreOwner =
     state.ownerId !== null && state.ownerId === state.youId && Boolean(onKick);
 
@@ -33,6 +36,9 @@ export function PlayerList({
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
+                {leaders.has(player.id) && (
+                  <Crown title="Лидер комнаты" className="mr-1" />
+                )}
                 {player.nickname}
                 {player.id === state.youId && (
                   <span className="ml-1 text-xs text-muted">· ты</span>
